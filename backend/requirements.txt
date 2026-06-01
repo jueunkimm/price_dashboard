@@ -1,0 +1,14 @@
+# Python 3.14 호환을 위해 하한 버전 핀(>=) 사용
+fastapi>=0.115.6
+uvicorn[standard]>=0.34.0
+sqlalchemy>=2.0.36
+psycopg[binary]>=3.2.10
+pydantic>=2.10.4
+pydantic-settings>=2.7.0
+python-dotenv>=1.0.1
+httpx>=0.28.1
+apscheduler>=3.11.0
+openpyxl>=3.1.0
+
+# 테스트
+pytest>=8.3.0

@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"C:/Users/22025064/Documents/price_dashboard/backend/.venv/Scripts/python.exe\" \"C:/Users/22025064/Documents/price_dashboard/backend/qa_check.py\"",
+            "timeout": 130,
+            "statusMessage": "QA 체크(pytest + 무결성) 실행 중..."
+          }
+        ]
+      }
+    ]
+  }
+}

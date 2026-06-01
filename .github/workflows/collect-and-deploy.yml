@@ -1,0 +1,82 @@
+name: collect-and-deploy
+
+# 매일 09:00 / 15:00 KST 자동 수집 → 정적 JSON 생성 → GitHub Pages 배포
+on:
+  schedule:
+    - cron: "0 0 * * *" # 00:00 UTC = 09:00 KST
+    - cron: "0 6 * * *" # 06:00 UTC = 15:00 KST
+  workflow_dispatch: {} # 수동 실행 버튼
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      # SQLite 파일 DB (backend/app.db). 모든 python은 backend 디렉터리에서 실행.
+      DATABASE_URL: "sqlite+pysqlite:///./app.db"
+      NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+      NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+      ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
+      PYTHONIOENCODING: "utf-8"
+    steps:
+      - uses: actions/checkout@v4
+
+      # 가격 히스토리(변동률 계산용) 누적 — DB를 캐시로 보존. 2회/일 cron이라 항상 신선.
+      - name: Restore price DB
+        uses: actions/cache@v4
+        with:
+          path: backend/app.db
+          key: pricedb-${{ github.run_id }}
+          restore-keys: pricedb-
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend deps
+        run: pip install -r backend/requirements.txt
+
+      - name: Seeds (idempotent) + 수집
+        working-directory: backend
+        run: |
+          python -m app.migrate
+          python -m app.seed
+          python -m app.seed_brands
+          python -m app.seed_events
+          python -m app.seed_alerts
+          python -m app.cuckoo_catalog
+          python -m collector.collect
+          python -m collector.collect_cuckoo
+          python -m collector.collect_demand --days 90
+          python -m collector.collect_macro --days 120 || echo "ECOS 키 없으면 건너뜀"
+          python -m collector.evaluate_alerts
+          python -m app.export_static
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Build frontend (정적)
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Save price DB (다음 수집에 누적)
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: backend/app.db
+          key: pricedb-${{ github.run_id }}
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+      - uses: actions/deploy-pages@v4

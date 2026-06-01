@@ -1,0 +1,32 @@
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Node / frontend
+node_modules/
+dist/
+*.local
+
+# DB / data
+*.sqlite3
+*.db
+pgdata/
+
+# 생성물(GitHub Actions가 매 수집마다 재생성)
+frontend/public/data/
+
+# Excel 임시 잠금 파일
+~$*.xlsx
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

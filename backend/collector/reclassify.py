@@ -1,0 +1,88 @@
+"""기존 product에 개선된 매처를 재적용해 is_own_brand/brand_id 보정.
+
+실행:  python -m collector.reclassify
+(네이버 재수집 없이 DB의 brand_raw/model_name 기준으로 재분류)
+"""
+from __future__ import annotations
+
+from sqlalchemy import select
+
+from app.database import SessionLocal
+from app.models import Category, Product
+from app.spec import extract_spec
+from app.textutil import extract_model_key, is_accessory_title, is_rental_title
+from collector.brand_matcher import BrandMatcher
+
+
+def reclassify() -> dict:
+    db = SessionLocal()
+    try:
+        matcher = BrandMatcher(db)
+        cat_names = {c.id: c.name for c in db.scalars(select(Category)).all()}
+        products = list(db.scalars(select(Product)).all())
+
+        before_own = sum(1 for p in products if p.is_own_brand)
+        changed_to_own = 0
+        changed_to_other = 0
+        category_moves = 0
+        promoted_examples: list[str] = []
+        demoted_examples: list[str] = []
+
+        for p in products:
+            m = matcher.match(
+                brand_raw=p.brand_raw or "",
+                title=p.model_name or "",
+                category_name=cat_names.get(p.category_id),
+            )
+            new_is_own = m.is_own
+            if new_is_own != p.is_own_brand:
+                if new_is_own:
+                    changed_to_own += 1
+                    if len(promoted_examples) < 5:
+                        promoted_examples.append(p.model_name[:50])
+                else:
+                    changed_to_other += 1
+                    if len(demoted_examples) < 8:
+                        demoted_examples.append(p.model_name[:50])
+            p.is_own_brand = new_is_own
+            p.brand_id = m.brand_id
+            p.is_rental = is_rental_title(p.model_name or "")
+            # 별매품: 제목 신호 OR 공식 카탈로그 별매품
+            p.is_accessory = is_accessory_title(p.model_name or "") or m.catalog_accessory
+            p.model_key = extract_model_key(p.model_name or "")
+            # 카테고리 교정: 공식 카탈로그가 권위 카테고리를 주면 이동
+            if m.reason == "catalog" and m.catalog_category_id and m.catalog_category_id != p.category_id:
+                category_moves += 1
+                p.category_id = m.catalog_category_id
+            cap_val, cap_unit, band = extract_spec(
+                cat_names.get(p.category_id), p.model_name or ""
+            )
+            p.capacity_value = cap_val
+            p.capacity_unit = cap_unit
+            p.spec_json = {"capacity_band": band} if band else None
+        db.commit()
+
+        after_own = sum(1 for p in products if p.is_own_brand)
+        result = {
+            "total_products": len(products),
+            "own_before": before_own,
+            "own_after": after_own,
+            "newly_own": changed_to_own,
+            "removed_false_positives": changed_to_other,
+            "rental_total": sum(1 for p in products if p.is_rental),
+            "accessory_total": sum(1 for p in products if p.is_accessory),
+            "category_moves": category_moves,
+            "with_model_key": sum(1 for p in products if p.model_key),
+            "with_capacity": sum(1 for p in products if p.capacity_value),
+            "demoted_examples": demoted_examples,
+        }
+        return result
+    finally:
+        db.close()
+
+
+if __name__ == "__main__":
+    import json
+
+    res = reclassify()
+    print(json.dumps(res, ensure_ascii=False, indent=2))
