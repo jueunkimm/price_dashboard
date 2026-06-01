@@ -55,6 +55,7 @@ jobs:
           python -m collector.collect_cuckoo
           python -m collector.collect_demand --days 90
           python -m collector.collect_macro --days 120 || echo "ECOS 키 없으면 건너뜀"
+          python -m collector.reclassify
           python -m collector.evaluate_alerts
           python -m app.export_static
 
