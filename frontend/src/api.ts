@@ -68,6 +68,11 @@ export interface DataQuality {
   variation_ready: boolean;
 }
 
+export interface SegProduct {
+  model_name: string;
+  brand: string;
+  current_price: number;
+}
 export interface SegPositioning {
   category_id: number;
   category_name: string;
@@ -77,6 +82,8 @@ export interface SegPositioning {
   segment_size: number;
   own_product_count: number;
   positioning_pct: number | null;
+  own_products: SegProduct[]; // 이 구간의 쿠쿠 모델
+  rival_products: SegProduct[]; // 같은 구간의 경쟁(비자사) 모델
 }
 
 export interface BrandRow {
@@ -265,7 +272,57 @@ export const api = {
       (m) => m[String(productId)] ?? { product_id: productId, model_name: "", is_own_brand: false, series: [] }
     ),
   positioning: () => loadJSON<Positioning[]>("positioning"),
-  positioningSegmented: () => loadJSON<SegPositioning[]>("positioning_segmented"),
+  // 동급(용량) 포지셔닝 — products.json에서 브라우저 계산(어떤 제품끼리 비교했는지 포함)
+  positioningSegmented: () =>
+    loadJSON<PRow[]>("products").then((rows) => {
+      const clean = dedup(rows.filter((p) => !p.is_rental));
+      const groups = new Map<string, PRow[]>();
+      for (const p of clean) {
+        if (!p.capacity_band) continue;
+        const k = `${p.category_id}|${p.category_name}|${p.capacity_band}`;
+        let list = groups.get(k);
+        if (!list) {
+          list = [];
+          groups.set(k, list);
+        }
+        list.push(p);
+      }
+      const toSeg = (p: PRow): SegProduct => ({
+        model_name: p.model_name,
+        brand: p.brand,
+        current_price: p.current_price,
+      });
+      const out: SegPositioning[] = [];
+      for (const [k, list] of groups) {
+        const own = list.filter((p) => p.is_own_brand);
+        if (!own.length) continue;
+        const [cidStr, cname, band] = k.split("|");
+        const all = list.map((p) => p.current_price);
+        const ownAvg = Math.round(own.reduce((a, p) => a + p.current_price, 0) / own.length);
+        const segAvg = Math.round(all.reduce((a, b) => a + b, 0) / all.length);
+        out.push({
+          category_id: Number(cidStr),
+          category_name: cname,
+          capacity_band: band,
+          own_avg_price: ownAvg,
+          segment_avg_price: segAvg,
+          segment_size: list.length,
+          own_product_count: own.length,
+          positioning_pct: segAvg ? Math.round(((ownAvg - segAvg) / segAvg) * 1000) / 10 : null,
+          own_products: own.sort((a, b) => a.current_price - b.current_price).map(toSeg),
+          rival_products: list
+            .filter((p) => !p.is_own_brand)
+            .sort((a, b) => a.current_price - b.current_price)
+            .map(toSeg),
+        });
+      }
+      out.sort((a, b) =>
+        a.category_name === b.category_name
+          ? a.capacity_band.localeCompare(b.capacity_band)
+          : a.category_name.localeCompare(b.category_name)
+      );
+      return out;
+    }),
   collectionLogs: (limit = 5) =>
     loadJSON<CollectionLog[]>("collection_logs").then((r) => r.slice(0, limit)),
   events: () => loadJSON<MarketEvent[]>("events"),

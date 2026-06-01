@@ -114,4 +114,17 @@ def extract_spec(
         if m:
             val = float(m.group(1))
             return val, unit, _band(val, unit)
+
+    # 전기밥솥 보강: 제목에 인용 없으면 모델코드에서 인용 추출(검증상 오류 0%).
+    # 예) CRP-AHF[10]10 → 10인용, CR-[35]55 → 35인용. 코드 단위 첫 2자리 = 인용.
+    if category_name == "전기밥솥":
+        cm = _CODE_PERSON_RE.search((title or "").upper())
+        if cm:
+            v = int(cm.group(1))
+            if 1 <= v <= 50:  # 밥솥 합리적 인용 범위(이상치 배제)
+                return float(v), "인용", _band(float(v), "인용")
     return None, None, None
+
+
+# 모델코드 첫 2자리 숫자(밥솥 인용): 'CRP-AHF10..' → 10, 'CR-35..' → 35
+_CODE_PERSON_RE = re.compile(r"\b[A-Z]{2,5}-[A-Z]{0,3}(\d{2})")

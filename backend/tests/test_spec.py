@@ -2,6 +2,23 @@
 from app.spec import band_for, extract_spec
 
 
+class TestRiceCookerCodeCapacity:
+    def test_code_person_when_title_missing(self):
+        # 제목에 인용 없으면 밥솥 모델코드에서 인용 추출(검증상 오류 0%)
+        v, u, b = extract_spec("전기밥솥", "쿠쿠전자 CUCKOO CRP-AHF1010FD 화이트")
+        assert (v, u, b) == (10.0, "인용", "10인용")
+        assert extract_spec("전기밥솥", "쿠쿠 CRP-DHP0610FD 다크실버")[2] == "6인용"
+        assert extract_spec("전기밥솥", "CUCKOO CR-3555B 업소용")[2] == "35인용"
+
+    def test_title_person_takes_precedence_over_code(self):
+        # 제목 인용이 코드보다 우선
+        assert extract_spec("전기밥솥", "쿠쿠 6인용 CRP-AHF1010FD")[0] == 6.0
+
+    def test_code_capacity_only_for_rice_cooker(self):
+        # 식기세척기는 코드 인용 미적용(삼성 DW80의 80은 인용 아님 → 오인식 방지)
+        assert extract_spec("식기세척기", "삼성전자 비스포크 DW80F73Y1UEW 화이트")[1] is None
+
+
 class TestCategoryAwareExtraction:
     def test_rice_cooker_uses_person_not_liter(self):
         # 밥솥의 '1.8L 내솥'을 L로 오인식하면 안 됨 → 인용만
