@@ -1,0 +1,71 @@
+name: deploy-on-push
+
+# main에 push될 때마다 자동 재배포(코드 변경 반영).
+# 수집은 안 하고(네이버 호출 0), 캐시된 DB에 최신 분류·코드만 적용해 빠르게 배포.
+# 실제 데이터 수집은 collect-and-deploy(매주 월·금 스케줄)가 담당.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: "sqlite+pysqlite:///./app.db"
+      NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+      NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+      ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
+      PYTHONIOENCODING: "utf-8"
+    steps:
+      - uses: actions/checkout@v4
+
+      # 마지막 수집(collect-and-deploy)이 저장한 가격 DB 복원
+      - name: Restore price DB
+        uses: actions/cache/restore@v4
+        with:
+          path: backend/app.db
+          key: pricedb-restore-${{ github.run_id }}
+          restore-keys: pricedb-
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend deps
+        run: pip install -r backend/requirements.txt
+
+      - name: 시드·재분류·export (수집 없음)
+        working-directory: backend
+        run: |
+          python -m app.seed
+          python -m app.seed_brands
+          python -m app.seed_events
+          python -m app.seed_alerts
+          python -m app.cuckoo_catalog
+          python -m collector.reclassify
+          python -m collector.evaluate_alerts
+          python -m app.export_static
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+      - uses: actions/deploy-pages@v4
