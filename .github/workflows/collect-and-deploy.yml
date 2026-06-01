@@ -46,7 +46,6 @@ jobs:
       - name: Seeds (idempotent) + 수집
         working-directory: backend
         run: |
-          python -m app.migrate
           python -m app.seed
           python -m app.seed_brands
           python -m app.seed_events
