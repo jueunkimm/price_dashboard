@@ -88,6 +88,7 @@ export interface SegPositioning {
 
 export interface BrandRow {
   brand: string;
+  brand_id: number | null;
   is_own: boolean;
   model_count: number;
   avg_price: number;
@@ -406,6 +407,7 @@ export const api = {
         const median = changes.length ? changes[Math.floor(changes.length / 2)] : null;
         return {
           brand,
+          brand_id: list[0].brand_id,
           is_own: list.some((r) => r.is_own_brand),
           model_count: list.length,
           avg_price: Math.round(prices.reduce((a, b) => a + b, 0) / prices.length),

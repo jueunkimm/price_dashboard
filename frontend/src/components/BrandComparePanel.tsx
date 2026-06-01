@@ -60,14 +60,19 @@ export default function BrandComparePanel({
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {rows.map((r) => {
+              const selected = filters.brand_id != null && r.brand_id === filters.brand_id;
+              return (
               <tr
                 key={r.brand}
-                className={`border-t border-slate-50 ${r.is_own ? "bg-own/5" : ""}`}
+                className={`border-t border-slate-50 ${
+                  selected ? "bg-amber-50 ring-1 ring-amber-200" : r.is_own ? "bg-own/5" : ""
+                }`}
               >
                 <td className="px-3 py-2 font-medium">
                   {r.is_own && <span className="text-own mr-1">★</span>}
                   {r.brand}
+                  {selected && <span className="ml-1.5 text-[10px] text-amber-600">← 선택</span>}
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-1.5">
@@ -86,7 +91,8 @@ export default function BrandComparePanel({
                   {pct(r.median_change_pct)}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

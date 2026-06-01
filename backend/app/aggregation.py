@@ -362,6 +362,7 @@ def brand_comparison(
         out.append(
             {
                 "brand": label,
+                "brand_id": rows[0]["product"].brand_id,
                 "is_own": is_own,
                 "model_count": len(rows),
                 "avg_price": round(statistics.mean(prices)),
