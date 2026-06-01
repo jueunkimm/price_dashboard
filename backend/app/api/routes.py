@@ -104,6 +104,7 @@ def brand_comparison(
     mall: str | None = Query(None),
     min_price: int | None = Query(None),
     max_price: int | None = Query(None),
+    exclude_rental: bool = Query(True),
     db: Session = Depends(get_db),
 ):
     """카테고리 내 브랜드별 가격/변동 비교(B-2) — 제품 목록과 동일 필터 반영."""
@@ -114,6 +115,7 @@ def brand_comparison(
         mall=mall,
         min_price=min_price,
         max_price=max_price,
+        exclude_rental=exclude_rental,
     )
 
 

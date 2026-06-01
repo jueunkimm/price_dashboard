@@ -319,14 +319,15 @@ def brand_comparison(
     mall: str | None = None,
     min_price: int | None = None,
     max_price: int | None = None,
+    exclude_rental: bool = True,
 ) -> list[dict]:
-    """카테고리 내 브랜드별 가격/변동 비교(B-2) — 부품·렌탈 제외, 모델 dedup.
+    """카테고리 내 브랜드별 가격/변동 비교(B-2) — 부품 제외, 모델 dedup.
 
-    제품 목록과 일관되게 용량/판매몰/가격대 필터를 동일 적용(own_only/brand는 비교 위해 미적용).
+    제품 목록과 일관되게 용량/판매몰/가격대/렌탈 필터를 동일 적용(own_only/brand는 비교 위해 미적용).
     """
     products = [
         p
-        for p in _load_products(db, False, exclude_rental=True, exclude_accessory=True)
+        for p in _load_products(db, False, exclude_rental=exclude_rental, exclude_accessory=True)
         if p.category_id == category_id
     ]
     snaps = _snaps_by_product(db, [p.id for p in products])

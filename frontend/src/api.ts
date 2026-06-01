@@ -325,13 +325,13 @@ export const api = {
 
   brandComparison: (categoryId: number, f: ProductFilters = {}) =>
     loadJSON<PRow[]>("products").then((rows) => {
-      // own_only/brand는 비교 위해 미적용, 나머지 필터는 동일
+      // own_only/brand는 비교 위해 미적용, 용량·몰·가격·렌탈 필터는 제품 목록과 동일
       const items = applyFilters(rows.filter((p) => p.category_id === categoryId), {
         capacity_band: f.capacity_band,
         mall: f.mall,
         min_price: f.min_price,
         max_price: f.max_price,
-        exclude_rental: true,
+        exclude_rental: f.exclude_rental,
       }, false);
       const byBrand = new Map<string, PRow[]>();
       for (const r of items) {

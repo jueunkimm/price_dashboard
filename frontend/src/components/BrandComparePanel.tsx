@@ -26,7 +26,7 @@ export default function BrandComparePanel({
     <div className="rounded-xl bg-white shadow-sm border border-slate-100 overflow-hidden">
       <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between">
         <span className="text-sm font-semibold text-slate-600">
-          {categoryName} 브랜드 비교 <span className="text-xs font-normal text-slate-400">· 부품·렌탈 제외</span>
+          {categoryName} 브랜드 비교 <span className="text-xs font-normal text-slate-400">· 부품 제외 · 전체 브랜드(필터 반영)</span>
         </span>
         <button
           onClick={() =>

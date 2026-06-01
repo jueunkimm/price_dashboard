@@ -18,8 +18,10 @@ export default function ProductResults({
 
   useEffect(() => {
     setLoading(true);
+    // 브랜드를 명시적으로 고르면 그 선택이 "쿠쿠만 보기" 토글보다 우선(충돌 방지).
+    const ownEffective = (ownOnly || !!filters.own_only) && !filters.brand_id;
     api
-      .productSearch({ ...filters, own_only: ownOnly || filters.own_only })
+      .productSearch({ ...filters, own_only: ownEffective })
       .then(setRows)
       .catch(() => setRows([]))
       .finally(() => setLoading(false));
