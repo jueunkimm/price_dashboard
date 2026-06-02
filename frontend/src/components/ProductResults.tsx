@@ -44,7 +44,7 @@ export default function ProductResults({
   }, [filters, ownOnly]);
 
   return (
-    <div className="overflow-x-auto rounded-xl bg-white border border-slate-100 shadow-sm">
+    <div className="rounded-xl bg-white border border-slate-100 shadow-sm">
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-slate-50">
         <span className="text-xs text-slate-400">{loading ? "조회 중…" : `${rows.length}건`}</span>
         {rows.length > 0 && (
@@ -93,8 +93,9 @@ export default function ProductResults({
           {loading ? "불러오는 중…" : "조건에 맞는 제품이 없습니다."}
         </div>
       ) : (
+        <div className="max-h-[60vh] overflow-auto rounded-b-xl">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-500 text-xs">
+          <thead className="bg-slate-50 text-slate-500 text-xs sticky top-0 z-10">
             <tr>
               <th className="text-left px-3 py-2">제품</th>
               <th className="text-left px-3 py-2">브랜드</th>
@@ -134,6 +135,7 @@ export default function ProductResults({
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );
