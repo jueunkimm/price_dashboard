@@ -11,8 +11,13 @@ from app.models import Brand
 
 # (표준명, [별칭...]) — 자사(쿠쿠) 제외 경쟁/주요 브랜드
 COMPETITORS: list[tuple[str, list[str]]] = [
-    ("삼성전자", ["삼성", "SAMSUNG", "삼성전자"]),
-    ("LG전자", ["LG", "엘지", "LG전자", "LG ELECTRONICS"]),
+    # 삼성/LG는 네이버 brand_raw에 라인명(비스포크·디오스 등)이 들어오므로 별칭으로 흡수
+    ("삼성전자", ["삼성", "SAMSUNG", "삼성전자", "비스포크", "BESPOKE", "그랑데", "셰프컬렉션"]),
+    ("LG전자", [
+        "LG", "엘지", "LG전자", "LG ELECTRONICS",
+        "디오스", "DIOS", "트롬", "TROMM", "오브제", "오브제컬렉션", "OBJET",
+        "스타일러", "STYLER", "휘센", "WHISEN", "통돌이", "코드제로", "퓨리케어", "틔운",
+    ]),
     ("위니아", ["위니아", "WINIA", "딤채", "위니아딤채"]),
     ("쿠첸", ["쿠첸", "CUCHEN"]),
     ("코웨이", ["코웨이", "COWAY"]),
@@ -56,6 +61,24 @@ COMPETITORS: list[tuple[str, list[str]]] = [
     ("보국전자", ["보국전자", "보국"]),
     ("카스", ["카스", "CAS"]),
     ("쿠잉", ["쿠잉", "CUING"]),
+    # 3차 보강 — 인지도 높은 미매칭 브랜드
+    ("샤크", ["샤크", "SHARK"]),
+    ("오아", ["오아"]),
+    ("노비타", ["노비타", "NOVITA"]),
+    ("인바디", ["인바디", "INBODY"]),
+    ("에코백스", ["에코백스", "ECOVACS"]),
+    ("브레빌", ["브레빌", "BREVILLE"]),
+    ("보스", ["BOSE", "보스"]),
+    ("유닉스", ["유닉스", "UNIX"]),
+    ("엡손", ["엡손", "EPSON"]),
+    ("뷰소닉", ["뷰소닉", "VIEWSONIC"]),
+    ("엑스지미", ["엑스지미", "XGIMI"]),
+    ("루메나", ["루메나", "LUMENA"]),
+    ("JMW", ["JMW"]),
+    ("보만", ["보만", "BOMANN"]),
+    ("듀플렉스", ["듀플렉스", "DUPLEX"]),
+    ("JBL", ["JBL"]),
+    ("대림바스", ["대림바스", "대림"]),
 ]
 
 
@@ -63,13 +86,18 @@ def seed_brands() -> int:
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     added = 0
+    updated = 0
     try:
         for name, aliases in COMPETITORS:
-            if not db.scalar(select(Brand).where(Brand.name == name)):
+            b = db.scalar(select(Brand).where(Brand.name == name))
+            if not b:
                 db.add(Brand(name=name, is_own=False, aliases_json=aliases))
                 added += 1
+            elif (b.aliases_json or []) != aliases:
+                b.aliases_json = aliases  # 별칭 변경 시 갱신(라인명 추가 등)
+                updated += 1
         db.commit()
-        print(f"[seed_brands] 경쟁 브랜드 {added}개 추가")
+        print(f"[seed_brands] 경쟁 브랜드 {added}개 추가 / {updated}개 별칭 갱신")
         return added
     finally:
         db.close()

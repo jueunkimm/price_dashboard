@@ -99,12 +99,16 @@ class BrandMatcher:
                 if alias and alias in nb:
                     return MatchResult(brand.id, bool(brand.is_own), 0.95, "brand_field")
 
+        # 제목(title) 매칭은 자사(쿠쿠)에만 적용 — 경쟁사 짧은/일반 별칭(오아·듀플렉스 등)이
+        # 제목 부분문자열로 오탐나는 것 방지. 경쟁사는 위 brand_raw(구조화 필드)로만 매칭.
         nt = _normalize(title)
         for alias, brand in self._alias_index:
+            if not brand.is_own:
+                continue
             if alias and alias in nt:
                 conf = 0.90 if _CUCKOO_CODE_RE.search(title or "") else 0.85
                 reason = "title+modelcode" if conf == 0.90 else "title"
-                return MatchResult(brand.id, bool(brand.is_own), conf, reason)
+                return MatchResult(brand.id, True, conf, reason)
 
         # brand_raw가 있으면(=타사명) 모델코드 fallback 금지
         if not nb and self._own_brand and cuckoo_code_in(title or "", category_name):

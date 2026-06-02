@@ -75,3 +75,15 @@ def test_unknown_brand_not_own(db):
     m = BrandMatcher(db).match(brand_raw="키친아트", title="KRC-1004 화이트", category_name="전기밥솥")
     assert not m.is_own
     assert m.brand_id is None
+
+
+def test_competitor_matched_via_brand_field(db):
+    # 경쟁사는 brand_raw(구조화 필드)로 매칭
+    m = BrandMatcher(db).match(brand_raw="쿠첸", title="쿠첸 전기밥솥", category_name="전기밥솥")
+    assert not m.is_own and m.reason == "brand_field"
+
+
+def test_competitor_title_only_not_matched(db):
+    # 경쟁사는 제목만으로는 매칭 안 함(오탐 방지) — brand_raw 비면 미상
+    m = BrandMatcher(db).match(brand_raw="", title="쿠첸 전기밥솥 압력", category_name="전기밥솥")
+    assert m.brand_id is None and not m.is_own
