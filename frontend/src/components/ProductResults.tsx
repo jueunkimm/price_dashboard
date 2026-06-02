@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, type FilteredProduct, type ProductFilters } from "../api";
 import { won, pct, changeColor } from "../format";
 import { downloadCsv, csvBtnClass } from "../csv";
@@ -15,6 +15,22 @@ export default function ProductResults({
 }) {
   const [rows, setRows] = useState<FilteredProduct[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // 현재 필터 결과의 가격 요약(평균·중앙값·최저·최고)
+  const stat = useMemo(() => {
+    const prices = rows.map((r) => r.current_price).sort((a, b) => a - b);
+    if (!prices.length) return null;
+    const sum = prices.reduce((a, b) => a + b, 0);
+    const mid = Math.floor(prices.length / 2);
+    const median = prices.length % 2 ? prices[mid] : (prices[mid - 1] + prices[mid]) / 2;
+    return {
+      count: prices.length,
+      avg: Math.round(sum / prices.length),
+      median: Math.round(median),
+      min: prices[0],
+      max: prices[prices.length - 1],
+    };
+  }, [rows]);
 
   useEffect(() => {
     setLoading(true);
@@ -54,6 +70,24 @@ export default function ProductResults({
           </button>
         )}
       </div>
+
+      {stat && (
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 px-3 py-2 bg-slate-50/70 border-b border-slate-100 text-sm">
+          {filters.capacity_band && (
+            <span className="text-xs font-semibold text-own">{filters.capacity_band}</span>
+          )}
+          <span className="text-slate-500">
+            평균 <b className="text-slate-700">{won(stat.avg)}</b>
+          </span>
+          <span className="text-slate-500">
+            중앙값 <b className="text-slate-700">{won(stat.median)}</b>
+          </span>
+          <span className="text-slate-400 text-xs">
+            최저 {won(stat.min)} · 최고 {won(stat.max)} · {stat.count}개
+          </span>
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <div className="py-12 text-center text-slate-400 text-sm">
           {loading ? "불러오는 중…" : "조건에 맞는 제품이 없습니다."}
