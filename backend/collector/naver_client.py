@@ -64,8 +64,10 @@ class NaverShopClient:
                     "mall": _clean(it.get("mallName", "")),
                     "link": it.get("link", ""),
                     "category": _clean(it.get("category3") or it.get("category2") or ""),
-                    # 네이버 세부분류(category4): 드럼세탁기·의류건조기·냉온정수기 등
-                    "sub_category": _clean(it.get("category4") or it.get("category3") or ""),
+                    # 네이버 세부분류(category4): 드럼세탁기·의류건조기·냉온정수기 등.
+                    # category3(상위 그룹명) 폴백은 쓰지 않음 — 카테고리명이 세부유형으로
+                    # 잘못 저장되는 것을 막고, 없으면 null로 두어 보강(enrich) 대상이 되게 함.
+                    "sub_category": _clean(it.get("category4") or ""),
                 }
             )
         return items
