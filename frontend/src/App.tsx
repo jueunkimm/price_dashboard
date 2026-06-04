@@ -190,8 +190,8 @@ export default function App() {
                     filters={filters}
                   />
 
-                  <div className="grid lg:grid-cols-2 gap-6">
-                    <section>
+                  <div className="grid lg:grid-cols-5 gap-6">
+                    <section className="lg:col-span-3 min-w-0">
                       <h2 className="text-sm font-semibold text-slate-500 mb-2">제품 목록</h2>
                       <ProductResults
                         filters={filters}
@@ -199,7 +199,7 @@ export default function App() {
                         onSelect={setSelectedProduct}
                       />
                     </section>
-                    <section className="space-y-4">
+                    <section className="lg:col-span-2 min-w-0 space-y-4">
                       <div>
                         <h2 className="text-sm font-semibold text-slate-500 mb-2">가격 추세</h2>
                         <TrendChart productId={selectedProduct} />

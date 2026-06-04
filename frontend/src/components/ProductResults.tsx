@@ -106,15 +106,13 @@ export default function ProductResults({
         </div>
       ) : (
         <div className="max-h-[60vh] overflow-auto rounded-b-xl">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm table-fixed">
           <thead className="bg-slate-50 text-slate-500 text-xs sticky top-0 z-10">
             <tr>
               <th className="text-left px-3 py-2">제품</th>
-              <th className="text-left px-3 py-2">브랜드</th>
-              <th className="text-left px-3 py-2">용량</th>
-              <th className="text-left px-3 py-2">판매몰</th>
-              <th className="text-right px-3 py-2">현재가</th>
-              <th className="text-right px-3 py-2">변동</th>
+              <th className="text-left px-3 py-2 w-16">용량</th>
+              <th className="text-right px-3 py-2 w-28">현재가</th>
+              <th className="text-right px-3 py-2 w-16">변동</th>
             </tr>
           </thead>
           <tbody>
@@ -122,37 +120,42 @@ export default function ProductResults({
               <tr
                 key={r.product_id}
                 onClick={() => onSelect(r.product_id)}
-                className="border-t border-slate-50 hover:bg-slate-50 cursor-pointer"
+                className="border-t border-slate-50 hover:bg-slate-50 cursor-pointer align-top"
               >
-                <td className="px-3 py-2 max-w-xs truncate">
-                  {r.is_own_brand && (
-                    <span className="text-[10px] bg-own/10 text-own px-1 py-0.5 rounded mr-1">쿠쿠</span>
-                  )}
-                  {r.is_rental && (
-                    <span className="text-[10px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded mr-1">렌탈</span>
-                  )}
-                  {r.sub_category && (
-                    <span className="text-[10px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded mr-1">{r.sub_category}</span>
-                  )}
-                  {r.off_category && (
-                    <span className="text-[10px] bg-orange-100 text-orange-600 px-1 py-0.5 rounded mr-1" title="네이버 분류가 이 카테고리와 달라 가격 통계에서 제외됨">타분류?</span>
-                  )}
-                  {r.model_name}
+                <td className="px-3 py-2 overflow-hidden">
+                  <div className="flex items-center gap-1 min-w-0">
+                    {r.is_own_brand && (
+                      <span className="shrink-0 text-[10px] bg-own/10 text-own px-1 py-0.5 rounded">쿠쿠</span>
+                    )}
+                    {r.is_rental && (
+                      <span className="shrink-0 text-[10px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded">렌탈</span>
+                    )}
+                    {r.off_category && (
+                      <span className="shrink-0 text-[10px] bg-orange-100 text-orange-600 px-1 py-0.5 rounded" title="네이버 분류가 이 카테고리와 달라 가격 통계에서 제외됨">타분류?</span>
+                    )}
+                    <span className="truncate">{r.model_name}</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                    <span className="text-slate-500">{r.brand}</span>
+                    {r.mall && (
+                      <>
+                        {" · "}
+                        {r.mall === "쿠팡" ? (
+                          <span className="text-rose-500 font-medium">쿠팡</span>
+                        ) : (
+                          r.mall
+                        )}
+                      </>
+                    )}
+                    {r.sub_category && <span className="text-slate-400">{" · "}{r.sub_category}</span>}
+                  </div>
                 </td>
-                <td className="px-3 py-2 text-slate-500">{r.brand}</td>
-                <td className="px-3 py-2 text-slate-500">{r.capacity_band ?? "—"}</td>
-                <td className="px-3 py-2">
-                  {r.mall === "쿠팡" ? (
-                    <span className="text-[11px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded">쿠팡</span>
-                  ) : (
-                    <span className="text-slate-400 text-xs">{r.mall ?? "—"}</span>
-                  )}
-                </td>
-                <td className="px-3 py-2 text-right">
+                <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{r.capacity_band ?? "—"}</td>
+                <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
                   {won(r.current_price)}
                   {r.is_rental && <span className="text-[10px] text-slate-400 ml-0.5">/월</span>}
                 </td>
-                <td className={`px-3 py-2 text-right font-medium ${changeColor(r.change_pct)}`}>
+                <td className={`px-3 py-2 text-right whitespace-nowrap font-medium tabular-nums ${changeColor(r.change_pct)}`}>
                   {pct(r.change_pct)}
                 </td>
               </tr>
