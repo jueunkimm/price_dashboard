@@ -172,6 +172,7 @@ export interface ProductRow {
 
 export interface FilterOptions {
   capacity_bands: string[];
+  sub_categories: string[];
   brands: { id: number; name: string; is_own: boolean }[];
   malls: { name: string; count: number }[];
   price_min: number;
@@ -184,6 +185,7 @@ export interface FilteredProduct {
   category_name: string;
   brand: string;
   capacity_band: string | null;
+  sub_category: string | null;
   mall: string | null;
   is_own_brand: boolean;
   is_rental: boolean;
@@ -195,6 +197,7 @@ export interface ProductFilters {
   category_id?: number;
   brand_id?: number;
   capacity_band?: string;
+  sub_category?: string;
   min_price?: number;
   max_price?: number;
   own_only?: boolean;
@@ -256,6 +259,7 @@ function applyFilters(rows: PRow[], f: ProductFilters, ownOnly: boolean): PRow[]
     if (f.category_id && p.category_id !== f.category_id) return false;
     if (f.brand_id != null && p.brand_id !== f.brand_id) return false;
     if (f.capacity_band && p.capacity_band !== f.capacity_band) return false;
+    if (f.sub_category && p.sub_category !== f.sub_category) return false;
     if (f.mall && (p.mall ?? "") !== f.mall) return false;
     if (f.min_price != null && p.current_price < f.min_price) return false;
     if (f.max_price != null && p.current_price > f.max_price) return false;
@@ -368,6 +372,7 @@ export const api = {
     loadJSON<PRow[]>("products").then((rows) => {
       const inCat = categoryId ? rows.filter((p) => p.category_id === categoryId) : rows;
       const bands = [...new Set(inCat.map((p) => p.capacity_band).filter(Boolean))].sort() as string[];
+      const subCats = [...new Set(inCat.map((p) => p.sub_category).filter(Boolean))].sort() as string[];
       const brandMap = new Map<number, { id: number; name: string; is_own: boolean }>();
       for (const p of inCat) if (p.brand_id != null) brandMap.set(p.brand_id, { id: p.brand_id, name: p.brand, is_own: p.is_own_brand });
       const brands = [...brandMap.values()].sort((a, b) => (a.is_own === b.is_own ? a.name.localeCompare(b.name) : a.is_own ? -1 : 1));
@@ -377,6 +382,7 @@ export const api = {
       const prices = inCat.map((p) => p.current_price);
       return {
         capacity_bands: bands,
+        sub_categories: subCats,
         brands,
         malls,
         price_min: prices.length ? Math.min(...prices) : 0,
@@ -389,6 +395,7 @@ export const api = {
       // own_only/brand는 비교 위해 미적용, 용량·몰·가격·렌탈 필터는 제품 목록과 동일
       const items = applyFilters(rows.filter((p) => p.category_id === categoryId), {
         capacity_band: f.capacity_band,
+        sub_category: f.sub_category,
         mall: f.mall,
         min_price: f.min_price,
         max_price: f.max_price,

@@ -15,6 +15,7 @@ COLUMNS = [
     ("product", "is_rental", "BOOLEAN NOT NULL DEFAULT 0"),
     ("product", "is_accessory", "BOOLEAN NOT NULL DEFAULT 0"),
     ("product", "model_key", "VARCHAR(120)"),
+    ("product", "sub_category", "VARCHAR(60)"),
     ("product", "capacity_value", "DOUBLE PRECISION"),
     ("product", "capacity_unit", "VARCHAR(20)"),
     ("price_snapshot", "is_synthetic", "BOOLEAN NOT NULL DEFAULT 0"),

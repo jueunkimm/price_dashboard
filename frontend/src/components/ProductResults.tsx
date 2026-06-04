@@ -59,6 +59,7 @@ export default function ProductResults({
                   { key: "model_name", label: "모델명" },
                   { key: "brand", label: "브랜드" },
                   { key: "category_name", label: "카테고리" },
+                  { key: "sub_category", label: "세부유형" },
                   { key: "capacity_band", label: "용량" },
                   { key: "mall", label: "판매몰" },
                   { key: "current_price", label: "현재가" },
@@ -126,6 +127,9 @@ export default function ProductResults({
                   )}
                   {r.is_rental && (
                     <span className="text-[10px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded mr-1">렌탈</span>
+                  )}
+                  {r.sub_category && (
+                    <span className="text-[10px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded mr-1">{r.sub_category}</span>
                   )}
                   {r.model_name}
                 </td>

@@ -64,6 +64,7 @@ def _all_products(db) -> list[dict]:
                 "is_own_brand": p.is_own_brand,
                 "is_rental": p.is_rental,
                 "model_key": p.model_key,
+                "sub_category": p.sub_category,
                 "capacity_band": aggregation._band(p),
                 "mall": aggregation._latest_mall(snaps.get(p.id, [])),
                 "current_price": ch["current_price"],

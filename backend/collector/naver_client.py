@@ -64,6 +64,8 @@ class NaverShopClient:
                     "mall": _clean(it.get("mallName", "")),
                     "link": it.get("link", ""),
                     "category": _clean(it.get("category3") or it.get("category2") or ""),
+                    # 네이버 세부분류(category4): 드럼세탁기·의류건조기·냉온정수기 등
+                    "sub_category": _clean(it.get("category4") or it.get("category3") or ""),
                 }
             )
         return items

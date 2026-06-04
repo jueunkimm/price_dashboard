@@ -61,6 +61,7 @@ class Product(Base):
     is_rental: Mapped[bool] = mapped_column(Boolean, default=False, index=True)  # 렌탈 상품(월렌탈료) 여부
     is_accessory: Mapped[bool] = mapped_column(Boolean, default=False, index=True)  # 부품/소모품(비교 제외)
     model_key: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)  # 모델 단위 dedup 키
+    sub_category: Mapped[str | None] = mapped_column(String(60), nullable=True, index=True)  # 네이버 세부분류(category4) 예: 드럼세탁기
     capacity_value: Mapped[float | None] = mapped_column(Float, nullable=True)  # 용량 수치(스펙 정규화)
     capacity_unit: Mapped[str | None] = mapped_column(String(20), nullable=True)  # 단위(인용/L/평 등)
     model_name: Mapped[str] = mapped_column(String(300), index=True)

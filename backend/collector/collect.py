@@ -44,6 +44,7 @@ def _upsert_product(
             is_rental=is_rental_title(item["title"]),
             is_accessory=is_accessory_title(item["title"]),
             model_key=extract_model_key(item["title"]),
+            sub_category=(item.get("sub_category") or "")[:60] or None,
             capacity_value=cap_val,
             capacity_unit=cap_unit,
             spec_json={"capacity_band": band} if band else None,
@@ -55,6 +56,10 @@ def _upsert_product(
         if m.brand_id and not product.brand_id:
             product.brand_id = m.brand_id
             product.is_own_brand = m.is_own
+        # 세부분류(category4)는 기존 제품에도 backfill — 첫 수집 후 일괄 채워짐
+        sub = (item.get("sub_category") or "")[:60] or None
+        if sub and product.sub_category != sub:
+            product.sub_category = sub
     return product
 
 

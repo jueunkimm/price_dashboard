@@ -30,6 +30,7 @@ export default function FilterBar({
 
   const chips: string[] = [];
   if (catName) chips.push(catName);
+  if (filters.sub_category) chips.push(filters.sub_category);
   if (filters.capacity_band) chips.push(filters.capacity_band);
   if (brandName) chips.push(brandName);
   if (filters.mall) chips.push(filters.mall);
@@ -43,6 +44,7 @@ export default function FilterBar({
       category_id: undefined,
       brand_id: undefined,
       capacity_band: undefined,
+      sub_category: undefined,
       mall: undefined,
       min_price: undefined,
       max_price: undefined,
@@ -89,6 +91,7 @@ export default function FilterBar({
                   onChange({
                     category_id: e.target.value ? Number(e.target.value) : undefined,
                     capacity_band: undefined,
+                    sub_category: undefined,
                     brand_id: undefined,
                     mall: undefined,
                   })
@@ -117,6 +120,23 @@ export default function FilterBar({
                 {opts?.capacity_bands.map((b) => (
                   <option key={b} value={b}>
                     {b}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="text-xs text-slate-500">세부유형</span>
+              <select
+                value={filters.sub_category ?? ""}
+                onChange={(e) => onChange({ sub_category: e.target.value || undefined })}
+                disabled={!opts?.sub_categories.length}
+                className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-2 py-1.5 disabled:bg-slate-50 disabled:text-slate-300"
+              >
+                <option value="">전체 세부유형</option>
+                {opts?.sub_categories.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
                   </option>
                 ))}
               </select>
