@@ -50,8 +50,8 @@ def reclassify() -> dict:
             # 별매품: 제목 신호 OR 공식 카탈로그 별매품
             p.is_accessory = is_accessory_title(p.model_name or "") or m.catalog_accessory
             p.model_key = extract_model_key(p.model_name or "")
-            # 카테고리 교정: 공식 카탈로그가 권위 카테고리를 주면 이동
-            if m.reason == "catalog" and m.catalog_category_id and m.catalog_category_id != p.category_id:
+            # 카테고리 교정: 카탈로그(또는 카탈로그 기반 prefix 권위)가 카테고리를 주면 이동
+            if m.catalog_category_id and m.catalog_category_id != p.category_id:
                 category_moves += 1
                 p.category_id = m.catalog_category_id
             cap_val, cap_unit, band = extract_spec(

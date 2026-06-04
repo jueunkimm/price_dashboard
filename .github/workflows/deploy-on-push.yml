@@ -53,6 +53,7 @@ jobs:
           python -m app.cuckoo_catalog
           python -m app.migrate
           python -m collector.reclassify
+          python -m collector.audit_categories || true
           python -m collector.evaluate_alerts
           python -m app.export_static
 

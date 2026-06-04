@@ -8,7 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
-from app.models import Brand, CuckooModel
+from app.models import Brand, Category, CuckooModel
 from collector.brand_matcher import BrandMatcher
 
 
@@ -82,6 +82,23 @@ def test_cuckoo_brand_with_title_is_own(db):
     # brand_raw=쿠쿠 + 제목에도 쿠쿠 → 자사 인정(정상 케이스)
     m = BrandMatcher(db).match(brand_raw="쿠쿠", title="쿠쿠 인스퓨어 가습기", category_name="가습기")
     assert m.is_own and m.reason == "brand_field"
+
+
+def test_prefix_category_authority(db):
+    # 카탈로그 미등록 쿠쿠라도 코드 prefix가 카탈로그상 단일 카테고리면 그 카테고리로 권위 부여
+    af = Category(name="에어프라이어", level=2)
+    db.add(af)
+    db.flush()
+    db.add_all([
+        CuckooModel(model_code="CAF-A0810TW", base_code="CAF-A0810TW",
+                    product_group="에어프라이어", mapped_category_id=af.id, is_accessory=False),
+        CuckooModel(model_code="CAF-B0810TW", base_code="CAF-B0810TW",
+                    product_group="에어프라이어", mapped_category_id=af.id, is_accessory=False),
+    ])
+    db.commit()
+    m = BrandMatcher(db)  # 새 모델 반영 위해 재생성
+    res = m.match(brand_raw="쿠쿠전자", title="쿠쿠전자 CUCKOO CAF-C9999 바스켓 튀김기", category_name="튀김기")
+    assert res.is_own and res.catalog_category_id == af.id
 
 
 def test_catalog_code_anywhere_in_title_is_own(db):

@@ -76,8 +76,9 @@ ACCESSORY_GROUPS = {"별매품", "펫별매품"}
 
 
 def normalize_code(code: str) -> str:
-    """모델코드 정규화 — 색상/리비전 접미 제거. 'CRP-AHF1020FD(R)' → 'CRP-AHF1020FD'."""
-    return re.split(r"[ (]", str(code).upper().strip())[0]
+    """모델코드 정규화 — 색상/리비전 접미 제거.
+    'CRP-AHF1020FD(R)'→'CRP-AHF1020FD', 'CBD-AM101W_WHFCCUS(S)'→'CBD-AM101W'."""
+    return re.split(r"[ (_]", str(code).upper().strip())[0]
 
 
 def seed_catalog(path: Path | None = None) -> dict:

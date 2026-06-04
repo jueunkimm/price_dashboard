@@ -63,9 +63,23 @@ class BrandMatcher:
         # 정규화 별칭 → brand 정확매칭 맵(제목 첫 토큰 매칭용 — 부분일치 오탐 방지)
         self._exact_alias: dict[str, Brand] = {a: b for a, b in self._alias_index if a}
         # 공식 카탈로그: base_code → (mapped_category_id, is_accessory)
+        cuckoo_models = list(db.scalars(select(CuckooModel)).all())
         self._catalog: dict[str, tuple[int | None, bool]] = {
             cm.base_code: (cm.mapped_category_id, cm.is_accessory)
-            for cm in db.scalars(select(CuckooModel)).all()
+            for cm in cuckoo_models
+        }
+        # 카탈로그 기반 prefix→카테고리 권위(단일 카테고리 prefix만 — 오탐 방지).
+        # 카탈로그 미등록 쿠쿠 신모델도 코드 prefix로 올바른 카테고리에 배치하기 위함.
+        from collections import Counter
+        pref: dict[str, Counter] = {}
+        for cm in cuckoo_models:
+            if cm.mapped_category_id and not cm.is_accessory:
+                p = cm.base_code.split("-")[0]
+                pref.setdefault(p, Counter())[cm.mapped_category_id] += 1
+        self._prefix_category: dict[str, int] = {
+            p: cc.most_common(1)[0][0]
+            for p, cc in pref.items()
+            if len(cc) == 1 and sum(cc.values()) >= 2
         }
 
     def _catalog_lookup(self, title: str) -> tuple[int | None, bool] | None:
@@ -74,6 +88,14 @@ class BrandMatcher:
             info = self._catalog.get(normalize_code(m.group(1)))
             if info is not None:
                 return info
+        return None
+
+    def _prefix_category_of(self, title: str) -> int | None:
+        """카탈로그 미등록 쿠쿠 제품의 코드 prefix로 권위 카테고리 추정(단일 prefix만)."""
+        for m in _CODE_TOKEN_RE.finditer((title or "").upper()):
+            cid = self._prefix_category.get(normalize_code(m.group(1)).split("-")[0])
+            if cid is not None:
+                return cid
         return None
 
     def is_strong_own(self, brand_raw: str = "", title: str = "", maker_raw: str = "") -> bool:
@@ -142,22 +164,28 @@ class BrandMatcher:
         def _own_ok(alias: str, field: str) -> bool:
             return alias == field and title_has_cuckoo
 
+        # 자사(카탈로그 미등록)는 코드 prefix로 권위 카테고리를 부여 → reclassify가 이동.
+        pref_cat = self._prefix_category_of(title)
+
         # brand_raw: 자사는 정확일치 + 제목 쿠쿠 확인, 경쟁사는 부분일치 허용.
         nb = _normalize(brand_raw)
         if nb:
             for alias, brand in self._alias_index:
                 if alias and (_own_ok(alias, nb) if brand.is_own else (alias in nb)):
-                    return MatchResult(brand.id, bool(brand.is_own), 0.95, "brand_field")
+                    cc = pref_cat if brand.is_own else None
+                    return MatchResult(brand.id, bool(brand.is_own), 0.95, "brand_field", cc)
 
         nm = _normalize(maker_raw)
         if nm:
             for alias, brand in self._alias_index:
                 if alias and (_own_ok(alias, nm) if brand.is_own else (alias in nm)):
-                    return MatchResult(brand.id, bool(brand.is_own), 0.93, "maker_field")
+                    cc = pref_cat if brand.is_own else None
+                    return MatchResult(brand.id, bool(brand.is_own), 0.93, "maker_field", cc)
 
         # 제목 첫 토큰 = 브랜드(자사·경쟁사 공통, 정확일치). '만토 쿠쿠'는 첫토큰 만토라 제외.
         lead = self._leading_brand(title)
         if lead is not None:
-            return MatchResult(lead.id, bool(lead.is_own), 0.90, "title_brand")
+            cc = pref_cat if lead.is_own else None
+            return MatchResult(lead.id, bool(lead.is_own), 0.90, "title_brand", cc)
 
         return MatchResult(None, False, 0.0, "none")
