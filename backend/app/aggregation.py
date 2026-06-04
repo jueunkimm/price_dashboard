@@ -22,10 +22,27 @@ def _day(dt: datetime) -> date:
     return dt.date()
 
 
+# 렌탈 월요금 오염 차단: 한 productId(네이버 가격비교)에 렌탈 오퍼가 끼면
+# 제목에 '렌탈'이 없어도 lprice가 월요금(보통 일시불가의 2~10%)으로 떨어져
+# 트렌드가 40만→1만처럼 비현실적으로 급락한다. 제목 기반 is_rental로는 못 잡으므로,
+# 같은 제품의 최고가(=일시불 추정) 대비 일정 비율 미만 스냅샷은 오염으로 보고 제외한다.
+# 0.2 = 정상 할인(통상 ≥30~40%)은 보존하고 렌탈 월요금(≤10%)만 걸러내는 안전 경계.
+_RENTAL_MIN_FRACTION = 0.2
+
+
 def _daily_prices(snaps: list[PriceSnapshot]) -> dict[date, int]:
-    """제품의 일자별 대표가(해당일 마지막 스냅샷의 list_price)."""
+    """제품의 일자별 대표가(해당일 마지막 스냅샷의 list_price).
+
+    렌탈 월요금 오염가(제품 최고가의 20% 미만)는 제외해 가격 왜곡을 방지한다.
+    """
+    valid = [s for s in snaps if s.list_price]
+    if not valid:
+        return {}
+    floor = max(s.list_price for s in valid) * _RENTAL_MIN_FRACTION
     by_day: dict[date, tuple[datetime, int]] = {}
-    for s in snaps:
+    for s in valid:
+        if s.list_price < floor:
+            continue  # 렌탈/오염 의심가 제외(일시불 대비 비현실적 저가)
         d = _day(s.collected_at)
         if d not in by_day or s.collected_at > by_day[d][0]:
             by_day[d] = (s.collected_at, s.list_price)
