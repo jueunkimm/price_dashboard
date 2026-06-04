@@ -41,11 +41,10 @@ def test_catalog_accessory_flag(db):
     assert m.is_own and m.catalog_accessory is True
 
 
-def test_cuckoo_not_in_catalog_not_own(db):
-    # 정책: 자사는 카탈로그(productlist.xlsx)에만 있을 때 인정.
-    # brand_raw=CUCKOO여도 카탈로그에 없는 코드면 자사 아님.
+def test_cuckoo_brand_field_is_own(db):
+    # 균형: brand_raw가 쿠쿠 제조사 별칭과 정확일치 → 카탈로그에 없어도 자사 인정.
     m = BrandMatcher(db).match(brand_raw="CUCKOO", title="CUCKOO CRP-EHB0310FW 화이트", category_name="전기밥솥")
-    assert not m.is_own
+    assert m.is_own and m.reason == "brand_field"
 
 
 def test_competitor_brand_field_not_own(db):
@@ -61,9 +60,15 @@ def test_competitor_modelcode_not_misclassified(db):
     assert not m.is_own
 
 
-def test_title_token_cuckoo_without_catalog_not_own(db):
-    # 제목 첫 토큰이 쿠쿠여도 카탈로그 코드가 없으면 자사 아님(정책: 카탈로그 전용)
+def test_title_token_cuckoo_is_own(db):
+    # 균형: 제목 첫 토큰이 정확히 '쿠쿠' → 자사(브랜드필드 없어도, 가스레인지 등 회복)
     m = BrandMatcher(db).match(brand_raw="", title="쿠쿠 스피드팟 멀티쿠커", category_name="멀티쿠커")
+    assert m.is_own and m.reason == "title_brand"
+
+
+def test_cuckoo_substring_brand_not_own(db):
+    # '쿠쿠토이즈'·'쿠쿠스토어'처럼 첫토큰이 쿠쿠가 '포함'만 된 다른 브랜드는 자사 아님
+    m = BrandMatcher(db).match(brand_raw="쿠쿠토이즈", title="쿠쿠토이즈 어린이 장난감", category_name="멀티쿠커")
     assert not m.is_own
 
 
@@ -79,8 +84,8 @@ def test_reseller_with_cuckoo_word_not_own(db):
     assert not m.is_own
 
 
-def test_noncatalog_modelcode_not_own(db):
-    # 카탈로그에 없는 쿠쿠식 코드(CRP-DHP0610FW)는 자사 아님(휴리스틱 prefix 매칭 폐지)
+def test_noncatalog_code_no_brand_not_own(db):
+    # 카탈로그에 없고 브랜드 신호(첫토큰·brand_raw)도 없으면 자사 아님(코드만으론 불인정)
     m = BrandMatcher(db).match(brand_raw="", title="CRP-DHP0610FW 화이트", category_name="전기밥솥")
     assert not m.is_own
 
@@ -133,9 +138,9 @@ def test_second_token_cuckoo_not_own(db):
 
 
 def test_is_strong_own_filter(db):
-    # 자사 보조 검색 필터 — 카탈로그(productlist.xlsx) 매칭만 True
+    # 자사 보조 검색 필터 — 카탈로그 또는 쿠쿠 제조사 정확일치만 True
     mt = BrandMatcher(db)
-    assert mt.is_strong_own(brand_raw="CUCKOO", title="CUCKOO CRP-AHF1010FD 화이트") is True
-    assert mt.is_strong_own(brand_raw="CUCKOO", title="CUCKOO CK-XYZ999 미등록모델") is False
-    assert mt.is_strong_own(brand_raw="CUCKOO스토어", title="고양이 캣타워") is False
-    assert mt.is_strong_own(brand_raw="", title="만토 CUCKOO 스피커") is False
+    assert mt.is_strong_own(brand_raw="CUCKOO", title="CUCKOO CK-XYZ999 미등록") is True  # brand 정확일치
+    assert mt.is_strong_own(brand_raw="", title="CUCKOO CRP-AHF1010FD 화이트") is True   # 카탈로그
+    assert mt.is_strong_own(brand_raw="CUCKOO스토어", title="고양이 캣타워") is False        # 리셀러
+    assert mt.is_strong_own(brand_raw="", title="만토 CUCKOO 스피커") is False              # 제목 토큰뿐

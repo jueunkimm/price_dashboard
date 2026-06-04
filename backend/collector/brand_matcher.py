@@ -77,11 +77,17 @@ class BrandMatcher:
         return None
 
     def is_strong_own(self, brand_raw: str = "", title: str = "", maker_raw: str = "") -> bool:
-        """자사 보조 검색('쿠쿠 {카테고리}') 결과 필터용 — 공식 카탈로그 매칭만 True.
+        """자사 보조 검색('쿠쿠 {카테고리}') 결과 필터용 — 진짜 쿠쿠만 True.
 
-        productlist.xlsx 모델코드와 일치하는 진짜 쿠쿠 제품만 채택(관련도 노이즈 차단).
+        카탈로그 매칭 또는 brand/maker가 쿠쿠 제조사 별칭과 정확일치할 때만 채택.
+        제목 토큰·부분일치(리셀러 '쿠쿠스토어' 등)는 제외 — 보조검색 관련도 노이즈 차단.
         """
-        return self._own_brand is not None and self._catalog_lookup(title) is not None
+        if self._own_brand is None:
+            return False
+        if self._catalog_lookup(title) is not None:
+            return True
+        own_aliases = {a for a, b in self._exact_alias.items() if b.is_own}
+        return _normalize(brand_raw) in own_aliases or _normalize(maker_raw) in own_aliases
 
     def _leading_brand(self, title: str) -> Brand | None:
         """제목 앞쪽 토큰이 브랜드 별칭과 '정확히' 일치하면 그 브랜드.
@@ -108,14 +114,16 @@ class BrandMatcher:
         category_name: str | None = None,
         maker_raw: str = "",
     ) -> MatchResult:
-        """판별 — 자사(쿠쿠)는 '공식 카탈로그(productlist.xlsx) 매칭'으로만 인정.
+        """판별(균형) — 자사(쿠쿠)는 카탈로그 OR 구조화된 쿠쿠 제조사 식별자로 인정.
 
-        정책: 쿠쿠 제품 여부는 productlist.xlsx 안의 모델코드와 일치할 때만 True.
-        brand_raw/maker/제목에 '쿠쿠'가 있어도 카탈로그에 없으면 자사로 보지 않는다
-        (리셀러 '쿠쿠스토어'·제품명 속 '쿠쿠' 등 오탐을 원천 차단).
-        경쟁사는 종전처럼 brand_raw(0.95) > maker(0.93) > 제목 첫 토큰(0.90)으로 매칭.
+        정책:
+        - 카탈로그(productlist.xlsx) 매칭 → 자사 0.99(+카테고리 권위).
+        - 그 외엔 brand_raw/maker/제목 첫 토큰이 '정확히' 쿠쿠 제조사 별칭(쿠쿠전자·
+          쿠쿠홈시스·CUCKOO·쿠쿠)일 때만 자사. 부분일치·제품명 속 '쿠쿠'는 불인정
+          → 리셀러 '쿠쿠스토어'·'만토 쿠쿠'·'쿠쿠토이즈' 등 오탐 차단.
+        경쟁사는 brand_raw(0.95) > maker(0.93) > 제목 첫 토큰(0.90), 부분일치 허용.
         """
-        # 0단계: 공식 카탈로그(productlist.xlsx) 매칭 — 자사 인정의 유일한 경로
+        # 0단계: 공식 카탈로그(productlist.xlsx) 매칭 — 자사+카테고리 권위
         if self._own_brand:
             cat_info = self._catalog_lookup(title)
             if cat_info is not None:
@@ -124,22 +132,22 @@ class BrandMatcher:
                     self._own_brand.id, True, 0.99, "catalog", mapped_cat, is_acc
                 )
 
-        # 이하는 '경쟁사' 매칭 전용 — 자사(쿠쿠) 별칭은 무시(카탈로그 외 쿠쿠는 미인정).
+        # brand_raw: 자사는 정확일치만(리셀러 substring 차단), 경쟁사는 부분일치 허용.
         nb = _normalize(brand_raw)
         if nb:
             for alias, brand in self._alias_index:
-                if alias and not brand.is_own and alias in nb:
-                    return MatchResult(brand.id, False, 0.95, "brand_field")
+                if alias and ((alias == nb) if brand.is_own else (alias in nb)):
+                    return MatchResult(brand.id, bool(brand.is_own), 0.95, "brand_field")
 
         nm = _normalize(maker_raw)
         if nm:
             for alias, brand in self._alias_index:
-                if alias and not brand.is_own and alias in nm:
-                    return MatchResult(brand.id, False, 0.93, "maker_field")
+                if alias and ((alias == nm) if brand.is_own else (alias in nm)):
+                    return MatchResult(brand.id, bool(brand.is_own), 0.93, "maker_field")
 
-        # 제목 첫 토큰 = 경쟁사 브랜드(삼성전자/LG전자 등 회복). 자사면 무시.
+        # 제목 첫 토큰 = 브랜드(자사·경쟁사 공통, 정확일치). '만토 쿠쿠'는 첫토큰 만토라 제외.
         lead = self._leading_brand(title)
-        if lead is not None and not lead.is_own:
-            return MatchResult(lead.id, False, 0.90, "title_brand")
+        if lead is not None:
+            return MatchResult(lead.id, bool(lead.is_own), 0.90, "title_brand")
 
         return MatchResult(None, False, 0.0, "none")
