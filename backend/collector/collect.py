@@ -93,8 +93,14 @@ def run_collection(display: int | None = None) -> dict:
 
             # 자사 보조 검색 — 일반 검색 상위 N위 밖이라도 쿠쿠 제품을 반드시 포착
             # (틈새 카테고리에서 자사 누락·★ 미표시 방지). external_id로 중복 제거.
+            # 단, '쿠쿠 X' 검색은 관련도 노이즈(리셀러 쿠쿠스토어 등)를 포함하므로
+            # '진짜 쿠쿠'(카탈로그/정확 brand·maker)만 채택해 카테고리 오염을 막는다.
             try:
-                items = items + client.search(f"쿠쿠 {keyword}", display=20)
+                own_hits = [
+                    it for it in client.search(f"쿠쿠 {keyword}", display=20)
+                    if matcher.is_strong_own(it.get("brand_raw", ""), it["title"], it.get("maker_raw", ""))
+                ]
+                items = items + own_hits
             except Exception as e:  # noqa: BLE001
                 print(f"[collect] 'cuckoo {keyword}' 보조검색 실패: {e}")
             seen_ids: set[str] = set()

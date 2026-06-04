@@ -79,6 +79,19 @@ class BrandMatcher:
                 return info
         return None
 
+    def is_strong_own(self, brand_raw: str = "", title: str = "", maker_raw: str = "") -> bool:
+        """자사 보조 검색('쿠쿠 {카테고리}') 결과 필터용 — '진짜 쿠쿠'만 True.
+
+        공식 카탈로그 모델코드 또는 brand/maker가 쿠쿠 별칭과 정확일치할 때만 인정.
+        제목 토큰·부분일치(리셀러 '쿠쿠스토어' 등)는 제외 — 보조 검색의 관련도 노이즈 차단.
+        """
+        if not self._own_brand:
+            return False
+        if self._catalog_lookup(title) is not None:
+            return True
+        own_aliases = {a for a, b in self._exact_alias.items() if b.is_own}
+        return _normalize(brand_raw) in own_aliases or _normalize(maker_raw) in own_aliases
+
     def _leading_brand(self, title: str) -> Brand | None:
         """제목 앞쪽 토큰이 브랜드 별칭과 '정확히' 일치하면 그 브랜드.
 
@@ -86,19 +99,15 @@ class BrandMatcher:
         시작 토큰 정확일치만 보므로 부분문자열 오탐(예: '보아르'에 '오아')이 없다.
         대괄호/괄호로 시작하는 토큰(예: '[26년형]')은 건너뛴다.
         """
-        checked = 0
+        # 첫 '의미 토큰' 1개만 검사 — 대괄호/괄호 토큰만 건너뛰고, 그 다음 토큰이 브랜드.
+        # 2번째 토큰까지 보면 '만토 쿠쿠 …'처럼 제품명 속 단어를 브랜드로 오인하므로 1개로 제한.
         for tok in (title or "").split():
-            if checked >= 2:
-                break
             if tok[:1] in "[(":
                 continue
             nt = _normalize(tok)
             if not nt:
                 continue
-            checked += 1
-            b = self._exact_alias.get(nt)
-            if b is not None:
-                return b
+            return self._exact_alias.get(nt)  # 첫 의미토큰이 별칭과 정확일치할 때만
         return None
 
     def match(
@@ -122,18 +131,24 @@ class BrandMatcher:
                     self._own_brand.id, True, 0.99, "catalog", mapped_cat, is_acc
                 )
 
+        # brand_raw 매칭: 자사(쿠쿠)는 정확일치만(리셀러 '쿠쿠스토어'·'쿠쿠몰' substring 오탐 방지),
+        # 경쟁사는 부분일치 허용('쿠쿠전자(주)' 등 표기 변형 흡수).
         nb = _normalize(brand_raw)
         if nb:
             for alias, brand in self._alias_index:
-                if alias and alias in nb:
+                if not alias:
+                    continue
+                if (alias == nb) if brand.is_own else (alias in nb):
                     return MatchResult(brand.id, bool(brand.is_own), 0.95, "brand_field")
 
-        # maker(제조사) 필드 — 네이버 brand에 라인명(김치플러스·비스포크 등)이 와서
-        # brand_raw 매칭이 실패할 때, 실제 제조사(삼성전자·LG전자)로 보강.
+        # maker(제조사) 필드 — brand에 라인명(김치플러스 등)이 와서 brand_raw 매칭이
+        # 실패할 때 실제 제조사로 보강. 자사는 동일하게 정확일치만.
         nm = _normalize(maker_raw)
         if nm:
             for alias, brand in self._alias_index:
-                if alias and alias in nm:
+                if not alias:
+                    continue
+                if (alias == nm) if brand.is_own else (alias in nm):
                     return MatchResult(brand.id, bool(brand.is_own), 0.93, "maker_field")
 
         # 제목 첫 토큰 = 브랜드(자사·경쟁사 공통). 시작 앵커 정확일치라 오탐이 적고,
@@ -142,15 +157,16 @@ class BrandMatcher:
         if lead is not None:
             return MatchResult(lead.id, bool(lead.is_own), 0.90, "title_brand")
 
-        # 자사(쿠쿠)는 제목 어디에 있어도 부분문자열로 추가 매칭(recall 보존).
-        nt = _normalize(title)
-        for alias, brand in self._alias_index:
-            if not brand.is_own:
-                continue
-            if alias and alias in nt:
-                conf = 0.90 if _CUCKOO_CODE_RE.search(title or "") else 0.85
-                reason = "title+modelcode" if conf == 0.90 else "title"
-                return MatchResult(brand.id, True, conf, reason)
+        # 자사(쿠쿠) 제목 부분문자열 매칭은 '쿠쿠 모델코드가 함께 있을 때'만 인정.
+        # 코드 없는 단순 substring은 리셀러('쿠쿠스토어')·제품명 속 단어를 오인하므로 제외.
+        # (브랜드가 첫 토큰인 정상 쿠쿠 제품은 위 _leading_brand가 이미 잡는다.)
+        if _CUCKOO_CODE_RE.search(title or ""):
+            nt = _normalize(title)
+            for alias, brand in self._alias_index:
+                if not brand.is_own:
+                    continue
+                if alias and alias in nt:
+                    return MatchResult(brand.id, True, 0.90, "title+modelcode")
 
         # brand_raw가 있으면(=타사명) 모델코드 fallback 금지
         if not nb and self._own_brand and cuckoo_code_in(title or "", category_name):

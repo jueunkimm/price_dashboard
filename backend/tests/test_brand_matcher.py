@@ -65,10 +65,16 @@ def test_title_token_cuckoo_no_brandfield(db):
     assert m.is_own and m.reason in ("title", "title_brand")
 
 
-def test_title_substring_cuckoo_mid(db):
-    # 쿠쿠가 앞 2토큰을 벗어나도 자사는 제목 부분문자열로 매칭(recall 보존)
-    m = BrandMatcher(db).match(brand_raw="", title="정품 정밀 가정용 쿠쿠 내솥", category_name="전기밥솥")
-    assert m.is_own and m.reason in ("title", "title+modelcode")
+def test_title_substring_cuckoo_with_code(db):
+    # 쿠쿠가 첫 토큰이 아니어도 '쿠쿠 모델코드'가 함께 있으면 자사 매칭(recall 보존)
+    m = BrandMatcher(db).match(brand_raw="", title="정품 가정용 쿠쿠 CRP-1010FD 내솥", category_name="전기밥솥")
+    assert m.is_own and m.reason == "title+modelcode"
+
+
+def test_title_substring_cuckoo_no_code_not_matched(db):
+    # 코드 없이 제목 중간 '쿠쿠'만으론 매칭 안 함(리셀러·제품명 단어 오탐 방지)
+    m = BrandMatcher(db).match(brand_raw="", title="정품 정밀 가정용 쿠쿠풍 내솥", category_name="전기밥솥")
+    assert not m.is_own
 
 
 def test_modelcode_only_empty_brand(db):
@@ -110,3 +116,23 @@ def test_maker_field_recovers_line_name_brand(db):
     )
     assert not m.is_own and m.reason == "maker_field"
     assert m.brand_id is not None
+
+
+def test_reseller_cuckoo_store_not_own(db):
+    # 리셀러 'CUCKOO스토어' brand_raw는 자사 아님(자사는 정확일치만, substring 오탐 방지).
+    m = BrandMatcher(db).match(brand_raw="CUCKOO스토어", title="CUCKOO스토어 고양이 캣타워", category_name="체온계")
+    assert not m.is_own and m.brand_id is None
+
+
+def test_second_token_cuckoo_not_own(db):
+    # 제품명 속 2번째 토큰 'CUCKOO'는 자사로 오인하지 않음(첫 의미토큰만 신뢰).
+    m = BrandMatcher(db).match(brand_raw="", title="만토 CUCKOO 휴대용 블루투스 스피커", category_name="블루투스스피커")
+    assert not m.is_own
+
+
+def test_is_strong_own_filter(db):
+    # 자사 보조 검색 필터 — 카탈로그/정확 brand·maker만 True
+    mt = BrandMatcher(db)
+    assert mt.is_strong_own(brand_raw="CUCKOO", title="CUCKOO CK-C170T", maker_raw="") is True
+    assert mt.is_strong_own(brand_raw="CUCKOO스토어", title="고양이 캣타워", maker_raw="") is False
+    assert mt.is_strong_own(brand_raw="", title="만토 CUCKOO 스피커", maker_raw="") is False
