@@ -91,6 +91,23 @@ def run_collection(display: int | None = None) -> dict:
                 print(f"[collect] '{keyword}' 검색 실패: {e}")
                 continue
 
+            # 자사 보조 검색 — 일반 검색 상위 N위 밖이라도 쿠쿠 제품을 반드시 포착
+            # (틈새 카테고리에서 자사 누락·★ 미표시 방지). external_id로 중복 제거.
+            try:
+                items = items + client.search(f"쿠쿠 {keyword}", display=20)
+            except Exception as e:  # noqa: BLE001
+                print(f"[collect] 'cuckoo {keyword}' 보조검색 실패: {e}")
+            seen_ids: set[str] = set()
+            deduped = []
+            for it in items:
+                eid = str(it.get("external_id") or "")
+                if eid and eid in seen_ids:
+                    continue
+                if eid:
+                    seen_ids.add(eid)
+                deduped.append(it)
+            items = deduped
+
             for item in items:
                 product = _upsert_product(db, cat.id, item, matcher, category_name=cat.name)
                 products_collected += 1
