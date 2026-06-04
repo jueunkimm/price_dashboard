@@ -86,6 +86,9 @@ class BrandMatcher:
             return False
         if self._catalog_lookup(title) is not None:
             return True
+        # 제목에 쿠쿠/CUCKOO가 있어야 brand/maker 정확일치도 인정(더티 brand_raw 차단)
+        if not (("쿠쿠" in (title or "")) or ("CUCKOO" in (title or "").upper())):
+            return False
         own_aliases = {a for a, b in self._exact_alias.items() if b.is_own}
         return _normalize(brand_raw) in own_aliases or _normalize(maker_raw) in own_aliases
 
@@ -132,17 +135,24 @@ class BrandMatcher:
                     self._own_brand.id, True, 0.99, "catalog", mapped_cat, is_acc
                 )
 
-        # brand_raw: 자사는 정확일치만(리셀러 substring 차단), 경쟁사는 부분일치 허용.
+        # 자사 brand_raw/maker 매칭은 제목에도 쿠쿠/CUCKOO가 있을 때만 인정.
+        # (일부 타사 제품이 brand_raw='쿠쿠'로 더티하게 들어오는 오탐 차단 — 예: 도루코 제모기)
+        title_has_cuckoo = ("쿠쿠" in (title or "")) or ("CUCKOO" in (title or "").upper())
+
+        def _own_ok(alias: str, field: str) -> bool:
+            return alias == field and title_has_cuckoo
+
+        # brand_raw: 자사는 정확일치 + 제목 쿠쿠 확인, 경쟁사는 부분일치 허용.
         nb = _normalize(brand_raw)
         if nb:
             for alias, brand in self._alias_index:
-                if alias and ((alias == nb) if brand.is_own else (alias in nb)):
+                if alias and (_own_ok(alias, nb) if brand.is_own else (alias in nb)):
                     return MatchResult(brand.id, bool(brand.is_own), 0.95, "brand_field")
 
         nm = _normalize(maker_raw)
         if nm:
             for alias, brand in self._alias_index:
-                if alias and ((alias == nm) if brand.is_own else (alias in nm)):
+                if alias and (_own_ok(alias, nm) if brand.is_own else (alias in nm)):
                     return MatchResult(brand.id, bool(brand.is_own), 0.93, "maker_field")
 
         # 제목 첫 토큰 = 브랜드(자사·경쟁사 공통, 정확일치). '만토 쿠쿠'는 첫토큰 만토라 제외.

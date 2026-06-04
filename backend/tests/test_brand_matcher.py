@@ -72,6 +72,18 @@ def test_cuckoo_substring_brand_not_own(db):
     assert not m.is_own
 
 
+def test_dirty_cuckoo_brand_without_title_not_own(db):
+    # 타사 제품이 brand_raw='쿠쿠'로 더티하게 와도 제목에 쿠쿠 없으면 자사 아님(도루코 제모기 케이스)
+    m = BrandMatcher(db).match(brand_raw="쿠쿠", title="도루코 샤이세이프 면도기 제모기날면도기", category_name="제모기")
+    assert not m.is_own
+
+
+def test_cuckoo_brand_with_title_is_own(db):
+    # brand_raw=쿠쿠 + 제목에도 쿠쿠 → 자사 인정(정상 케이스)
+    m = BrandMatcher(db).match(brand_raw="쿠쿠", title="쿠쿠 인스퓨어 가습기", category_name="가습기")
+    assert m.is_own and m.reason == "brand_field"
+
+
 def test_catalog_code_anywhere_in_title_is_own(db):
     # 카탈로그 코드가 제목 어디에 있든 자사 인정(브랜드명 없어도)
     m = BrandMatcher(db).match(brand_raw="", title="정품 가정용 CRP-AHF1010FD 내솥", category_name="전기밥솥")
