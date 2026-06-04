@@ -51,21 +51,34 @@ def _all_products(db) -> list[dict]:
     cats = {c.id: c.name for c in db.scalars(select(Category)).all()}
     brands = {b.id: b.name for b in db.scalars(select(Brand)).all()}
 
-    # 카테고리별 세부유형 빈도(non-null) — 미분류 표시용 폴백에 사용
+    # 카테고리별 세부유형 빈도(non-null) + 전체 수 — 폴백 판단에 사용
     sub_dist: dict[int, Counter] = defaultdict(Counter)
+    cat_total: dict[int, int] = defaultdict(int)
     for p in products:
+        cat_total[p.category_id] += 1
         if p.sub_category:
             sub_dist[p.category_id][p.sub_category] += 1
+
+    # 네이버 category4 커버리지가 충분한(≥40%) 카테고리만 '진짜 세부유형 보유'로 간주.
+    # 피부케어기기·두피케어기기처럼 category4가 대부분 비어 소수 오분류(기타수작업공구 등)만
+    # 있는 카테고리는 폴백을 끄고 세부유형을 비워둔다(노이즈 라벨 방지).
+    has_real_subtypes = {
+        cid for cid, cnt in sub_dist.items()
+        if sum(cnt.values()) >= max(3, 0.4 * cat_total[cid])
+    }
 
     rows = []
     for p in products:
         ch = aggregation.product_change(snaps.get(p.id, []))
         if ch["current_price"] is None:
             continue
-        # DB는 null 유지(다음 수집의 enrich가 정확히 채우게) — 표시값만 폴백 분류
-        sub = p.sub_category or display_subtype(
-            cats.get(p.category_id), p.model_name, sub_dist.get(p.category_id)
-        )
+        # DB는 null 유지(다음 수집의 enrich가 정확히 채우게) — 표시값만 폴백 분류.
+        # 진짜 세부유형이 없는 카테고리는 폴백하지 않음(null 유지).
+        sub = p.sub_category
+        if not sub and p.category_id in has_real_subtypes:
+            sub = display_subtype(
+                cats.get(p.category_id), p.model_name, sub_dist.get(p.category_id)
+            )
         rows.append(
             {
                 "product_id": p.id,
