@@ -139,6 +139,15 @@ def category_overview(db: Session, is_own_only: bool = False) -> list[dict]:
     }
 
     cats = {c.id: c for c in db.scalars(select(Category).where(Category.level == 2)).all()}
+    # 자사 라인업(★)은 정적 시드 플래그가 아니라 '실제 매칭된 자사 제품 ≥1건'으로 판정.
+    # 쿠쿠홈시스 라인업 확장(냉장고·세탁기·에어컨 등) 같은 변화를 수집 데이터가 자동 반영.
+    own_cat_ids = set(
+        db.scalars(
+            select(Product.category_id)
+            .where(Product.is_own_brand.is_(True), Product.is_accessory.is_(False))
+            .distinct()
+        ).all()
+    )
     threshold = settings.anomaly_threshold_pct
     results = []
     for cat_id, rows in by_cat.items():
@@ -153,7 +162,7 @@ def category_overview(db: Session, is_own_only: bool = False) -> list[dict]:
             {
                 "category_id": cat_id,
                 "category_name": cat.name,
-                "has_own_lineup": cat.has_own_lineup,
+                "has_own_lineup": cat_id in own_cat_ids,
                 "product_count": len(rows),
                 "avg_price": round(statistics.mean(prices)),
                 "median_price": round(statistics.median(prices)),

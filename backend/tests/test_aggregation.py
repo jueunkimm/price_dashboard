@@ -6,7 +6,13 @@ _daily_prices가 제품 최고가 대비 20% 미만 스냅샷을 제외하는지
 """
 from datetime import datetime, timezone
 
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 from app import aggregation
+from app.database import Base
+from app.models import Brand, Category, PriceSnapshot, Product
 
 
 def _snap(price: int, day: int):
@@ -45,3 +51,68 @@ def test_product_change_ignores_rental_crash():
     assert ch["current_price"] == 417_120
     # 유효일이 하루뿐이므로 변동률은 None(가짜 급락 없음)
     assert ch["change_pct"] is None
+
+
+@pytest.fixture
+def db():
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    s = sessionmaker(bind=engine)()
+    yield s
+    s.close()
+
+
+def _dbsnap(product_id: int, price: int, day: int) -> PriceSnapshot:
+    return PriceSnapshot(
+        product_id=product_id,
+        list_price=price,
+        collected_at=datetime(2026, 6, day, 12, 0, tzinfo=timezone.utc),
+    )
+
+
+def test_has_own_lineup_is_data_driven(db):
+    # ★(자사 라인업)은 정적 시드 플래그가 아니라 '실제 자사 매칭 ≥1건'으로 판정해야 한다.
+    own = Brand(name="쿠쿠", is_own=True)
+    rival = Brand(name="경쟁사", is_own=False)
+    db.add_all([own, rival])
+    db.flush()
+
+    # A: 정적 플래그는 False지만 자사 제품이 실제로 있음 → ★ 여야 함
+    cat_a = Category(name="냉장고", level=2, has_own_lineup=False)
+    # B: 정적 플래그는 True지만 자사 제품이 없음 → ★ 아니어야 함
+    cat_b = Category(name="TV", level=2, has_own_lineup=True)
+    db.add_all([cat_a, cat_b])
+    db.flush()
+
+    pa = Product(category_id=cat_a.id, model_name="쿠쿠 냉장고", brand_id=own.id,
+                 is_own_brand=True, is_accessory=False, is_rental=False)
+    pb = Product(category_id=cat_b.id, model_name="경쟁 TV", brand_id=rival.id,
+                 is_own_brand=False, is_accessory=False, is_rental=False)
+    db.add_all([pa, pb])
+    db.flush()
+    db.add_all([_dbsnap(pa.id, 800_000, 1), _dbsnap(pb.id, 1_000_000, 1)])
+    db.commit()
+
+    res = {r["category_name"]: r["has_own_lineup"] for r in aggregation.category_overview(db)}
+    assert res["냉장고"] is True   # 자사 제품 존재 → 정적 False 무시하고 ★
+    assert res["TV"] is False      # 자사 제품 없음 → 정적 True 무시하고 ★ 제거
+
+
+def test_has_own_lineup_ignores_accessory_only(db):
+    # 자사 매칭이 부품(액세서리)뿐이면 라인업으로 치지 않는다.
+    own = Brand(name="쿠쿠", is_own=True)
+    db.add(own)
+    db.flush()
+    cat = Category(name="전기밥솥", level=2, has_own_lineup=False)
+    db.add(cat)
+    db.flush()
+    acc = Product(category_id=cat.id, model_name="쿠쿠 내솥", brand_id=own.id,
+                  is_own_brand=True, is_accessory=True, is_rental=False)
+    db.add(acc)
+    db.flush()
+    db.add(_dbsnap(acc.id, 30_000, 1))
+    db.commit()
+
+    res = {r["category_name"]: r["has_own_lineup"] for r in aggregation.category_overview(db)}
+    # 부품만 있으면 본품 라인업 아님(애초에 집계 풀에서도 제외되어 결과 미포함이면 통과)
+    assert res.get("전기밥솥", False) is False
