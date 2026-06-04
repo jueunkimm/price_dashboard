@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import sys
+from collections import Counter, defaultdict
 from datetime import date, datetime
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from sqlalchemy import select
 
 from app import aggregation, report
 from app.database import SessionLocal
+from collector.enrich_subcategory import display_subtype
 from app.models import (
     Alert,
     Brand,
@@ -48,11 +50,22 @@ def _all_products(db) -> list[dict]:
     snaps = aggregation._snaps_by_product(db, [p.id for p in products])
     cats = {c.id: c.name for c in db.scalars(select(Category)).all()}
     brands = {b.id: b.name for b in db.scalars(select(Brand)).all()}
+
+    # 카테고리별 세부유형 빈도(non-null) — 미분류 표시용 폴백에 사용
+    sub_dist: dict[int, Counter] = defaultdict(Counter)
+    for p in products:
+        if p.sub_category:
+            sub_dist[p.category_id][p.sub_category] += 1
+
     rows = []
     for p in products:
         ch = aggregation.product_change(snaps.get(p.id, []))
         if ch["current_price"] is None:
             continue
+        # DB는 null 유지(다음 수집의 enrich가 정확히 채우게) — 표시값만 폴백 분류
+        sub = p.sub_category or display_subtype(
+            cats.get(p.category_id), p.model_name, sub_dist.get(p.category_id)
+        )
         rows.append(
             {
                 "product_id": p.id,
@@ -64,7 +77,7 @@ def _all_products(db) -> list[dict]:
                 "is_own_brand": p.is_own_brand,
                 "is_rental": p.is_rental,
                 "model_key": p.model_key,
-                "sub_category": p.sub_category,
+                "sub_category": sub,
                 "capacity_band": aggregation._band(p),
                 "mall": aggregation._latest_mall(snaps.get(p.id, [])),
                 "current_price": ch["current_price"],

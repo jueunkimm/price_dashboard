@@ -60,9 +60,15 @@ def test_competitor_modelcode_not_misclassified(db):
 
 
 def test_title_token_cuckoo_no_brandfield(db):
-    # brand_raw 비고 제목에 쿠쿠 → 자사(recall 보존)
+    # brand_raw 비고 제목 첫 토큰이 쿠쿠 → 자사(recall 보존, 첫토큰 경로)
     m = BrandMatcher(db).match(brand_raw="", title="쿠쿠 스피드팟 멀티쿠커", category_name="멀티쿠커")
-    assert m.is_own and m.reason == "title"
+    assert m.is_own and m.reason in ("title", "title_brand")
+
+
+def test_title_substring_cuckoo_mid(db):
+    # 쿠쿠가 앞 2토큰을 벗어나도 자사는 제목 부분문자열로 매칭(recall 보존)
+    m = BrandMatcher(db).match(brand_raw="", title="정품 정밀 가정용 쿠쿠 내솥", category_name="전기밥솥")
+    assert m.is_own and m.reason in ("title", "title+modelcode")
 
 
 def test_modelcode_only_empty_brand(db):
@@ -83,7 +89,24 @@ def test_competitor_matched_via_brand_field(db):
     assert not m.is_own and m.reason == "brand_field"
 
 
-def test_competitor_title_only_not_matched(db):
-    # 경쟁사는 제목만으로는 매칭 안 함(오탐 방지) — brand_raw 비면 미상
+def test_competitor_leading_token_matched(db):
+    # 제목 첫 토큰이 브랜드면 경쟁사도 매칭(삼성/LG 등 회복). 시작 앵커라 오탐 적음.
     m = BrandMatcher(db).match(brand_raw="", title="쿠첸 전기밥솥 압력", category_name="전기밥솥")
+    assert not m.is_own and m.reason == "title_brand"
+    assert m.brand_id is not None
+
+
+def test_competitor_mid_title_not_matched(db):
+    # 첫 토큰이 아닌 제목 '내부'엔 브랜드명이 없으면 매칭 안 함(오탐 방지).
+    m = BrandMatcher(db).match(brand_raw="", title="가정용 미니 압력 밥솥", category_name="전기밥솥")
     assert m.brand_id is None and not m.is_own
+
+
+def test_maker_field_recovers_line_name_brand(db):
+    # brand에 미시드 라인명, maker에 시드 제조사 → maker로 매칭(삼성 김치플러스 케이스 모사).
+    m = BrandMatcher(db).match(
+        brand_raw="라인명없음", title="라인명없음 압력밥솥", category_name="전기밥솥",
+        maker_raw="쿠첸",
+    )
+    assert not m.is_own and m.reason == "maker_field"
+    assert m.brand_id is not None

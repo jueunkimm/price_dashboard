@@ -73,6 +73,26 @@ def _resolve_subtype(items: list[dict], code: str) -> str | None:
     return Counter(found).most_common(1)[0][0] if found else None
 
 
+def display_subtype(
+    category_name: str | None, title: str | None, dist: "Counter | None"
+) -> str | None:
+    """미분류(null) 상품의 표시용 세부유형 폴백(API 없음, export 시점).
+
+    우선순위: 제목 키워드(정확) → 단일유형 카테고리(그 유형 하나뿐, 정확)
+    → 다중유형이면 최빈 유형(차선 추정). dist는 해당 카테고리의 non-null 세부유형 빈도.
+    네이버가 세분류를 안 하는 카테고리(dist 비어있음)는 None 유지.
+    """
+    st = _title_subtype(category_name, title)
+    if st:
+        return st
+    if not dist:
+        return None
+    labels = list(dist)
+    if len(labels) == 1:
+        return labels[0]  # 단일유형 → 정확
+    return dist.most_common(1)[0][0]  # 다중유형 → 최빈(차선)
+
+
 def enrich(max_codes: int = 800, sleep: float = 0.15) -> dict:
     db = SessionLocal()
     a_count = 0

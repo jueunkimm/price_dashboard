@@ -2,10 +2,13 @@
 
 네트워크 없이 순수 로직만 검증.
 """
+from collections import Counter
+
 from collector.enrich_subcategory import (
     _model_code,
     _resolve_subtype,
     _title_subtype,
+    display_subtype,
 )
 
 
@@ -46,3 +49,27 @@ def test_resolve_subtype_none_when_no_match():
         {"sub_category": "일반세탁기", "title": "전혀 다른 제품 XYZ-1111"},
     ]
     assert _resolve_subtype(items, "CWM-ATFF1210B") is None
+
+
+def test_display_subtype_title_first():
+    # 제목 신호가 있으면 그것을 우선(폴백 중 가장 정확)
+    dist = Counter({"일반세탁기": 10, "드럼세탁기": 5})
+    assert display_subtype("세탁기", "LG 드럼 세탁기", dist) == "드럼세탁기"
+
+
+def test_display_subtype_single_type_exact():
+    # 단일유형 카테고리 → 그 유형(정확)
+    dist = Counter({"전자레인지": 20})
+    assert display_subtype("전자레인지·오븐", "쿠쿠 미니 전자레인지", dist) == "전자레인지"
+
+
+def test_display_subtype_multi_most_common():
+    # 다중유형·제목신호 없음 → 최빈(차선)
+    dist = Counter({"압력밥솥": 30, "일반밥솥": 10})
+    assert display_subtype("전기밥솥", "쿠쿠 CR-1075S 실버", dist) == "압력밥솥"
+
+
+def test_display_subtype_no_info_returns_none():
+    # 세부유형 정보가 전혀 없으면 None(미분류 유지)
+    assert display_subtype("어떤카테고리", "제품명", None) is None
+    assert display_subtype("어떤카테고리", "제품명", Counter()) is None

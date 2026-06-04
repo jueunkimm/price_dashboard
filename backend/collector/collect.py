@@ -24,7 +24,10 @@ def _upsert_product(
 ) -> Product:
     """external_id(없으면 model_name) 기준 product upsert + 브랜드 매칭."""
     m = matcher.match(
-        brand_raw=item["brand_raw"], title=item["title"], category_name=category_name
+        brand_raw=item["brand_raw"],
+        title=item["title"],
+        category_name=category_name,
+        maker_raw=item.get("maker_raw", ""),
     )
 
     product = None

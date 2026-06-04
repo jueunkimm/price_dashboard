@@ -60,6 +60,7 @@ class NaverShopClient:
                     "external_id": it.get("productId"),
                     "title": _clean(it.get("title", "")),
                     "brand_raw": _clean(it.get("brand") or it.get("maker") or ""),
+                    "maker_raw": _clean(it.get("maker") or ""),  # 제조사(브랜드에 라인명 올 때 보강)
                     "price": price,
                     "mall": _clean(it.get("mallName", "")),
                     "link": it.get("link", ""),

@@ -63,6 +63,8 @@ class BrandMatcher:
                 if alias:
                     self._alias_index.append((_normalize(alias), b))
         self._alias_index.sort(key=lambda x: len(x[0]), reverse=True)
+        # 정규화 별칭 → brand 정확매칭 맵(제목 첫 토큰 매칭용 — 부분일치 오탐 방지)
+        self._exact_alias: dict[str, Brand] = {a: b for a, b in self._alias_index if a}
         # 공식 카탈로그: base_code → (mapped_category_id, is_accessory)
         self._catalog: dict[str, tuple[int | None, bool]] = {
             cm.base_code: (cm.mapped_category_id, cm.is_accessory)
@@ -77,10 +79,37 @@ class BrandMatcher:
                 return info
         return None
 
+    def _leading_brand(self, title: str) -> Brand | None:
+        """제목 앞쪽 토큰이 브랜드 별칭과 '정확히' 일치하면 그 브랜드.
+
+        네이버 제목은 보통 '브랜드 제품명…' 형태라 첫 토큰이 브랜드다.
+        시작 토큰 정확일치만 보므로 부분문자열 오탐(예: '보아르'에 '오아')이 없다.
+        대괄호/괄호로 시작하는 토큰(예: '[26년형]')은 건너뛴다.
+        """
+        checked = 0
+        for tok in (title or "").split():
+            if checked >= 2:
+                break
+            if tok[:1] in "[(":
+                continue
+            nt = _normalize(tok)
+            if not nt:
+                continue
+            checked += 1
+            b = self._exact_alias.get(nt)
+            if b is not None:
+                return b
+        return None
+
     def match(
-        self, brand_raw: str = "", title: str = "", category_name: str | None = None
+        self,
+        brand_raw: str = "",
+        title: str = "",
+        category_name: str | None = None,
+        maker_raw: str = "",
     ) -> MatchResult:
-        """판별 — 공식 카탈로그(0.99·권위) > brand_raw(0.95) > 제목토큰(0.85~0.90) > 모델코드+카테고리(0.80).
+        """판별 — 카탈로그(0.99) > brand_raw(0.95) > maker(0.93) > 제목첫토큰(0.90) >
+        자사 제목부분(0.85~0.90) > 모델코드+카테고리(0.80).
 
         공식 카탈로그 정확 매칭은 경쟁사가 공유하지 않는 쿠쿠 고유 코드이므로 최우선·권위.
         """
@@ -99,8 +128,21 @@ class BrandMatcher:
                 if alias and alias in nb:
                     return MatchResult(brand.id, bool(brand.is_own), 0.95, "brand_field")
 
-        # 제목(title) 매칭은 자사(쿠쿠)에만 적용 — 경쟁사 짧은/일반 별칭(오아·듀플렉스 등)이
-        # 제목 부분문자열로 오탐나는 것 방지. 경쟁사는 위 brand_raw(구조화 필드)로만 매칭.
+        # maker(제조사) 필드 — 네이버 brand에 라인명(김치플러스·비스포크 등)이 와서
+        # brand_raw 매칭이 실패할 때, 실제 제조사(삼성전자·LG전자)로 보강.
+        nm = _normalize(maker_raw)
+        if nm:
+            for alias, brand in self._alias_index:
+                if alias and alias in nm:
+                    return MatchResult(brand.id, bool(brand.is_own), 0.93, "maker_field")
+
+        # 제목 첫 토큰 = 브랜드(자사·경쟁사 공통). 시작 앵커 정확일치라 오탐이 적고,
+        # brand_raw가 비거나 라인명일 때 삼성전자/LG전자 등을 회복한다.
+        lead = self._leading_brand(title)
+        if lead is not None:
+            return MatchResult(lead.id, bool(lead.is_own), 0.90, "title_brand")
+
+        # 자사(쿠쿠)는 제목 어디에 있어도 부분문자열로 추가 매칭(recall 보존).
         nt = _normalize(title)
         for alias, brand in self._alias_index:
             if not brand.is_own:
