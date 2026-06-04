@@ -207,6 +207,9 @@ export interface ProductFilters {
   mall?: string;
 }
 
+// 네이버 category4가 없는 상품을 담는 세부유형 버킷 라벨
+export const UNCLASSIFIED = "미분류";
+
 // ── 정적 JSON 데이터 레이어 (백엔드 없음 · GitHub Pages용) ──
 // GitHub Actions가 하루 2회 생성한 /data/*.json 을 읽고, 파라미터형은 브라우저에서 필터링.
 const BASE = import.meta.env.BASE_URL; // 예: '/' 또는 '/price-dashboard/'
@@ -259,7 +262,12 @@ function applyFilters(rows: PRow[], f: ProductFilters, ownOnly: boolean): PRow[]
     if (f.category_id && p.category_id !== f.category_id) return false;
     if (f.brand_id != null && p.brand_id !== f.brand_id) return false;
     if (f.capacity_band && p.capacity_band !== f.capacity_band) return false;
-    if (f.sub_category && p.sub_category !== f.sub_category) return false;
+    if (f.sub_category) {
+      // 네이버가 세부분류(category4)를 안 준 상품은 null → "미분류" 버킷으로 매칭(누락 방지)
+      if (f.sub_category === UNCLASSIFIED) {
+        if (p.sub_category) return false;
+      } else if (p.sub_category !== f.sub_category) return false;
+    }
     if (f.mall && (p.mall ?? "") !== f.mall) return false;
     if (f.min_price != null && p.current_price < f.min_price) return false;
     if (f.max_price != null && p.current_price > f.max_price) return false;
@@ -372,7 +380,11 @@ export const api = {
     loadJSON<PRow[]>("products").then((rows) => {
       const inCat = categoryId ? rows.filter((p) => p.category_id === categoryId) : rows;
       const bands = [...new Set(inCat.map((p) => p.capacity_band).filter(Boolean))].sort() as string[];
-      const subCats = [...new Set(inCat.map((p) => p.sub_category).filter(Boolean))].sort() as string[];
+      const subCatsReal = [...new Set(inCat.map((p) => p.sub_category).filter(Boolean))].sort() as string[];
+      // 실제 세부유형이 하나라도 있고, 미분류(null) 상품도 있으면 "미분류" 옵션을 추가해 누락 방지
+      const hasUnclassified = inCat.some((p) => !p.sub_category);
+      const subCats =
+        subCatsReal.length && hasUnclassified ? [...subCatsReal, UNCLASSIFIED] : subCatsReal;
       const brandMap = new Map<number, { id: number; name: string; is_own: boolean }>();
       for (const p of inCat) if (p.brand_id != null) brandMap.set(p.brand_id, { id: p.brand_id, name: p.brand, is_own: p.is_own_brand });
       const brands = [...brandMap.values()].sort((a, b) => (a.is_own === b.is_own ? a.name.localeCompare(b.name) : a.is_own ? -1 : 1));
