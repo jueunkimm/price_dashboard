@@ -188,6 +188,8 @@ export interface FilteredProduct {
   sub_category: string | null;
   off_category: boolean;
   mall: string | null;
+  image_url: string | null;
+  link: string | null;
   is_own_brand: boolean;
   is_rental: boolean;
   current_price: number;

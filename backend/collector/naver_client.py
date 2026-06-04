@@ -64,6 +64,7 @@ class NaverShopClient:
                     "price": price,
                     "mall": _clean(it.get("mallName", "")),
                     "link": it.get("link", ""),
+                    "image": it.get("image", ""),  # 네이버 상품 썸네일 URL(핫링크)
                     "category": _clean(it.get("category3") or it.get("category2") or ""),
                     # 네이버 세부분류(category4): 드럼세탁기·의류건조기·냉온정수기 등.
                     # category3(상위 그룹명) 폴백은 쓰지 않음 — 카테고리명이 세부유형으로

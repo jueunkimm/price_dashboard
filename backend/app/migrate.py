@@ -17,6 +17,8 @@ COLUMNS = [
     ("product", "model_key", "VARCHAR(120)"),
     ("product", "sub_category", "VARCHAR(60)"),
     ("product", "naver_cat", "VARCHAR(60)"),
+    ("product", "image_url", "VARCHAR(500)"),
+    ("product", "link", "VARCHAR(500)"),
     ("product", "capacity_value", "DOUBLE PRECISION"),
     ("product", "capacity_unit", "VARCHAR(20)"),
     ("price_snapshot", "is_synthetic", "BOOLEAN NOT NULL DEFAULT 0"),

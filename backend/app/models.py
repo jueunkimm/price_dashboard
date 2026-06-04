@@ -63,6 +63,8 @@ class Product(Base):
     model_key: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)  # 모델 단위 dedup 키
     sub_category: Mapped[str | None] = mapped_column(String(60), nullable=True, index=True)  # 네이버 세부분류(category4) 예: 드럼세탁기
     naver_cat: Mapped[str | None] = mapped_column(String(60), nullable=True, index=True)  # 네이버 상위분류(category3) 예: 세탁/건조기 — 카테고리 정합성 점검용
+    image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)  # 네이버 상품 썸네일 URL(핫링크)
+    link: Mapped[str | None] = mapped_column(String(500), nullable=True)  # 네이버 상품 페이지 URL
     capacity_value: Mapped[float | None] = mapped_column(Float, nullable=True)  # 용량 수치(스펙 정규화)
     capacity_unit: Mapped[str | None] = mapped_column(String(20), nullable=True)  # 단위(인용/L/평 등)
     model_name: Mapped[str] = mapped_column(String(300), index=True)

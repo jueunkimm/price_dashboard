@@ -49,6 +49,8 @@ def _upsert_product(
             model_key=extract_model_key(item["title"]),
             sub_category=(item.get("sub_category") or "")[:60] or None,
             naver_cat=(item.get("category") or "")[:60] or None,
+            image_url=(item.get("image") or "")[:500] or None,
+            link=(item.get("link") or "")[:500] or None,
             capacity_value=cap_val,
             capacity_unit=cap_unit,
             spec_json={"capacity_band": band} if band else None,
@@ -67,6 +69,12 @@ def _upsert_product(
         nc = (item.get("category") or "")[:60] or None
         if nc and product.naver_cat != nc:
             product.naver_cat = nc
+        img = (item.get("image") or "")[:500] or None
+        if img and product.image_url != img:
+            product.image_url = img
+        lnk = (item.get("link") or "")[:500] or None
+        if lnk and product.link != lnk:
+            product.link = lnk
     return product
 
 

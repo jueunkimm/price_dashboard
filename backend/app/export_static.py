@@ -108,6 +108,8 @@ def _all_products(db) -> list[dict]:
                 ),
                 "capacity_band": aggregation._band(p),
                 "mall": aggregation._latest_mall(snaps.get(p.id, [])),
+                "image_url": p.image_url,
+                "link": p.link,
                 "current_price": ch["current_price"],
                 "prev_price": ch["prev_price"],
                 "change_pct": ch["change_pct"],
