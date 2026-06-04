@@ -198,7 +198,8 @@ export interface ProductFilters {
   min_price?: number;
   max_price?: number;
   own_only?: boolean;
-  exclude_rental?: boolean;
+  exclude_rental?: boolean; // (구) 렌탈 제외 플래그 — pricing 미지정 시 호환용
+  pricing?: "onetime" | "rental" | "all"; // 일시불(기본)·렌탈만·전체
   q?: string;
   mall?: string;
 }
@@ -246,9 +247,11 @@ function dedup(rows: PRow[]): PRow[] {
 }
 
 function applyFilters(rows: PRow[], f: ProductFilters, ownOnly: boolean): PRow[] {
-  const excludeRental = f.exclude_rental !== false;
+  // 일시불(기본)·렌탈만·전체. 구 exclude_rental 플래그도 계속 지원.
+  const pricing = f.pricing ?? (f.exclude_rental === false ? "all" : "onetime");
   const filtered = rows.filter((p) => {
-    if (excludeRental && p.is_rental) return false;
+    if (pricing === "onetime" && p.is_rental) return false;
+    if (pricing === "rental" && !p.is_rental) return false;
     if ((ownOnly || f.own_only) && !p.is_own_brand) return false;
     if (f.category_id && p.category_id !== f.category_id) return false;
     if (f.brand_id != null && p.brand_id !== f.brand_id) return false;
@@ -390,6 +393,7 @@ export const api = {
         min_price: f.min_price,
         max_price: f.max_price,
         exclude_rental: f.exclude_rental,
+        pricing: f.pricing,
       }, false);
       const byBrand = new Map<string, PRow[]>();
       for (const r of items) {

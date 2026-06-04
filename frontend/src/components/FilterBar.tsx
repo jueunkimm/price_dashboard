@@ -21,11 +21,20 @@ export default function FilterBar({
   const catName = cats.find((c) => c.category_id === filters.category_id)?.category_name;
   const brandName = opts?.brands.find((b) => b.id === filters.brand_id)?.name;
 
+  const pricing = filters.pricing ?? "onetime";
+  const PRICING = [
+    { k: "onetime", label: "일시불" },
+    { k: "rental", label: "렌탈" },
+    { k: "all", label: "전체" },
+  ] as const;
+
   const chips: string[] = [];
   if (catName) chips.push(catName);
   if (filters.capacity_band) chips.push(filters.capacity_band);
   if (brandName) chips.push(brandName);
   if (filters.mall) chips.push(filters.mall);
+  if (pricing === "rental") chips.push("렌탈");
+  else if (pricing === "all") chips.push("일시불+렌탈");
   if (filters.min_price != null || filters.max_price != null)
     chips.push(`${filters.min_price?.toLocaleString() ?? "0"}~${filters.max_price?.toLocaleString() ?? "∞"}원`);
 
@@ -37,6 +46,7 @@ export default function FilterBar({
       mall: undefined,
       min_price: undefined,
       max_price: undefined,
+      pricing: undefined,
     });
 
   return (
@@ -171,14 +181,22 @@ export default function FilterBar({
             </div>
 
             <div className="flex flex-col justify-end gap-1.5 pb-0.5">
-              <label className="flex items-center gap-2 text-sm text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={filters.exclude_rental !== false}
-                  onChange={(e) => onChange({ exclude_rental: e.target.checked })}
-                />
-                렌탈 제외
-              </label>
+              <span className="text-xs text-slate-500">구분(렌탈/일시불)</span>
+              <div className="flex rounded-lg border border-slate-200 overflow-hidden text-xs">
+                {PRICING.map((p) => (
+                  <button
+                    key={p.k}
+                    onClick={() => onChange({ pricing: p.k })}
+                    className={`flex-1 px-1 py-1.5 transition ${
+                      pricing === p.k
+                        ? "bg-own text-white font-medium"
+                        : "text-slate-500 hover:bg-slate-50"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
               {chips.length > 0 && (
                 <button onClick={reset} className="text-xs text-own hover:underline text-left">
                   필터 초기화

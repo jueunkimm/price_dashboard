@@ -16,9 +16,12 @@ export default function ProductResults({
   const [rows, setRows] = useState<FilteredProduct[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // 현재 필터 결과의 가격 요약(평균·중앙값·최저·최고)
+  // 현재 필터 결과의 가격 요약(평균·중앙값·최저·최고).
+  // '전체' 모드에서 일시불가와 렌탈 월요금이 섞이면 평균이 왜곡되므로,
+  // 렌탈 모드일 때만 월요금 기준으로 계산하고 그 외엔 일시불(비렌탈)만 집계.
   const stat = useMemo(() => {
-    const prices = rows.map((r) => r.current_price).sort((a, b) => a - b);
+    const base = filters.pricing === "rental" ? rows : rows.filter((r) => !r.is_rental);
+    const prices = base.map((r) => r.current_price).sort((a, b) => a - b);
     if (!prices.length) return null;
     const sum = prices.reduce((a, b) => a + b, 0);
     const mid = Math.floor(prices.length / 2);
@@ -30,7 +33,7 @@ export default function ProductResults({
       min: prices[0],
       max: prices[prices.length - 1],
     };
-  }, [rows]);
+  }, [rows, filters.pricing]);
 
   useEffect(() => {
     setLoading(true);
@@ -76,6 +79,11 @@ export default function ProductResults({
           {filters.capacity_band && (
             <span className="text-xs font-semibold text-own">{filters.capacity_band}</span>
           )}
+          {filters.pricing === "rental" && (
+            <span className="text-[11px] font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
+              렌탈 · 월 요금 기준
+            </span>
+          )}
           <span className="text-slate-500">
             평균 <b className="text-slate-700">{won(stat.avg)}</b>
           </span>
@@ -116,6 +124,9 @@ export default function ProductResults({
                   {r.is_own_brand && (
                     <span className="text-[10px] bg-own/10 text-own px-1 py-0.5 rounded mr-1">쿠쿠</span>
                   )}
+                  {r.is_rental && (
+                    <span className="text-[10px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded mr-1">렌탈</span>
+                  )}
                   {r.model_name}
                 </td>
                 <td className="px-3 py-2 text-slate-500">{r.brand}</td>
@@ -127,7 +138,10 @@ export default function ProductResults({
                     <span className="text-slate-400 text-xs">{r.mall ?? "—"}</span>
                   )}
                 </td>
-                <td className="px-3 py-2 text-right">{won(r.current_price)}</td>
+                <td className="px-3 py-2 text-right">
+                  {won(r.current_price)}
+                  {r.is_rental && <span className="text-[10px] text-slate-400 ml-0.5">/월</span>}
+                </td>
                 <td className={`px-3 py-2 text-right font-medium ${changeColor(r.change_pct)}`}>
                   {pct(r.change_pct)}
                 </td>
