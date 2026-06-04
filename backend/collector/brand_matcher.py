@@ -15,11 +15,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.cuckoo_catalog import normalize_code
-from app.cuckoo_models import cuckoo_code_in
 from app.models import Brand, CuckooModel
 
-# 쿠쿠식 모델코드(일반형): 예) CRP-RT0610FR, CMC-QSB501S, CP-QN1410MW, CBT-G1411F
-_CUCKOO_CODE_RE = re.compile(r"\bC[A-Z]{1,3}-?\d{3,4}", re.IGNORECASE)
 # 제목에서 모델코드 토큰 추출
 _CODE_TOKEN_RE = re.compile(r"\b([A-Z]{2,5}-[A-Z0-9]{3,})")
 
@@ -80,17 +77,11 @@ class BrandMatcher:
         return None
 
     def is_strong_own(self, brand_raw: str = "", title: str = "", maker_raw: str = "") -> bool:
-        """자사 보조 검색('쿠쿠 {카테고리}') 결과 필터용 — '진짜 쿠쿠'만 True.
+        """자사 보조 검색('쿠쿠 {카테고리}') 결과 필터용 — 공식 카탈로그 매칭만 True.
 
-        공식 카탈로그 모델코드 또는 brand/maker가 쿠쿠 별칭과 정확일치할 때만 인정.
-        제목 토큰·부분일치(리셀러 '쿠쿠스토어' 등)는 제외 — 보조 검색의 관련도 노이즈 차단.
+        productlist.xlsx 모델코드와 일치하는 진짜 쿠쿠 제품만 채택(관련도 노이즈 차단).
         """
-        if not self._own_brand:
-            return False
-        if self._catalog_lookup(title) is not None:
-            return True
-        own_aliases = {a for a, b in self._exact_alias.items() if b.is_own}
-        return _normalize(brand_raw) in own_aliases or _normalize(maker_raw) in own_aliases
+        return self._own_brand is not None and self._catalog_lookup(title) is not None
 
     def _leading_brand(self, title: str) -> Brand | None:
         """제목 앞쪽 토큰이 브랜드 별칭과 '정확히' 일치하면 그 브랜드.
@@ -117,12 +108,14 @@ class BrandMatcher:
         category_name: str | None = None,
         maker_raw: str = "",
     ) -> MatchResult:
-        """판별 — 카탈로그(0.99) > brand_raw(0.95) > maker(0.93) > 제목첫토큰(0.90) >
-        자사 제목부분(0.85~0.90) > 모델코드+카테고리(0.80).
+        """판별 — 자사(쿠쿠)는 '공식 카탈로그(productlist.xlsx) 매칭'으로만 인정.
 
-        공식 카탈로그 정확 매칭은 경쟁사가 공유하지 않는 쿠쿠 고유 코드이므로 최우선·권위.
+        정책: 쿠쿠 제품 여부는 productlist.xlsx 안의 모델코드와 일치할 때만 True.
+        brand_raw/maker/제목에 '쿠쿠'가 있어도 카탈로그에 없으면 자사로 보지 않는다
+        (리셀러 '쿠쿠스토어'·제품명 속 '쿠쿠' 등 오탐을 원천 차단).
+        경쟁사는 종전처럼 brand_raw(0.95) > maker(0.93) > 제목 첫 토큰(0.90)으로 매칭.
         """
-        # 0단계: 공식 카탈로그 정확 매칭(최우선)
+        # 0단계: 공식 카탈로그(productlist.xlsx) 매칭 — 자사 인정의 유일한 경로
         if self._own_brand:
             cat_info = self._catalog_lookup(title)
             if cat_info is not None:
@@ -131,45 +124,22 @@ class BrandMatcher:
                     self._own_brand.id, True, 0.99, "catalog", mapped_cat, is_acc
                 )
 
-        # brand_raw 매칭: 자사(쿠쿠)는 정확일치만(리셀러 '쿠쿠스토어'·'쿠쿠몰' substring 오탐 방지),
-        # 경쟁사는 부분일치 허용('쿠쿠전자(주)' 등 표기 변형 흡수).
+        # 이하는 '경쟁사' 매칭 전용 — 자사(쿠쿠) 별칭은 무시(카탈로그 외 쿠쿠는 미인정).
         nb = _normalize(brand_raw)
         if nb:
             for alias, brand in self._alias_index:
-                if not alias:
-                    continue
-                if (alias == nb) if brand.is_own else (alias in nb):
-                    return MatchResult(brand.id, bool(brand.is_own), 0.95, "brand_field")
+                if alias and not brand.is_own and alias in nb:
+                    return MatchResult(brand.id, False, 0.95, "brand_field")
 
-        # maker(제조사) 필드 — brand에 라인명(김치플러스 등)이 와서 brand_raw 매칭이
-        # 실패할 때 실제 제조사로 보강. 자사는 동일하게 정확일치만.
         nm = _normalize(maker_raw)
         if nm:
             for alias, brand in self._alias_index:
-                if not alias:
-                    continue
-                if (alias == nm) if brand.is_own else (alias in nm):
-                    return MatchResult(brand.id, bool(brand.is_own), 0.93, "maker_field")
+                if alias and not brand.is_own and alias in nm:
+                    return MatchResult(brand.id, False, 0.93, "maker_field")
 
-        # 제목 첫 토큰 = 브랜드(자사·경쟁사 공통). 시작 앵커 정확일치라 오탐이 적고,
-        # brand_raw가 비거나 라인명일 때 삼성전자/LG전자 등을 회복한다.
+        # 제목 첫 토큰 = 경쟁사 브랜드(삼성전자/LG전자 등 회복). 자사면 무시.
         lead = self._leading_brand(title)
-        if lead is not None:
-            return MatchResult(lead.id, bool(lead.is_own), 0.90, "title_brand")
-
-        # 자사(쿠쿠) 제목 부분문자열 매칭은 '쿠쿠 모델코드가 함께 있을 때'만 인정.
-        # 코드 없는 단순 substring은 리셀러('쿠쿠스토어')·제품명 속 단어를 오인하므로 제외.
-        # (브랜드가 첫 토큰인 정상 쿠쿠 제품은 위 _leading_brand가 이미 잡는다.)
-        if _CUCKOO_CODE_RE.search(title or ""):
-            nt = _normalize(title)
-            for alias, brand in self._alias_index:
-                if not brand.is_own:
-                    continue
-                if alias and alias in nt:
-                    return MatchResult(brand.id, True, 0.90, "title+modelcode")
-
-        # brand_raw가 있으면(=타사명) 모델코드 fallback 금지
-        if not nb and self._own_brand and cuckoo_code_in(title or "", category_name):
-            return MatchResult(self._own_brand.id, True, 0.80, "modelcode+category")
+        if lead is not None and not lead.is_own:
+            return MatchResult(lead.id, False, 0.90, "title_brand")
 
         return MatchResult(None, False, 0.0, "none")

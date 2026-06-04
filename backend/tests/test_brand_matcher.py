@@ -41,9 +41,11 @@ def test_catalog_accessory_flag(db):
     assert m.is_own and m.catalog_accessory is True
 
 
-def test_brand_field_cuckoo(db):
-    m = BrandMatcher(db).match(brand_raw="CUCKOO", title="CRP-EHB0310FW 화이트", category_name="전기밥솥")
-    assert m.is_own and m.reason == "brand_field"
+def test_cuckoo_not_in_catalog_not_own(db):
+    # 정책: 자사는 카탈로그(productlist.xlsx)에만 있을 때 인정.
+    # brand_raw=CUCKOO여도 카탈로그에 없는 코드면 자사 아님.
+    m = BrandMatcher(db).match(brand_raw="CUCKOO", title="CUCKOO CRP-EHB0310FW 화이트", category_name="전기밥솥")
+    assert not m.is_own
 
 
 def test_competitor_brand_field_not_own(db):
@@ -59,28 +61,28 @@ def test_competitor_modelcode_not_misclassified(db):
     assert not m.is_own
 
 
-def test_title_token_cuckoo_no_brandfield(db):
-    # brand_raw 비고 제목 첫 토큰이 쿠쿠 → 자사(recall 보존, 첫토큰 경로)
+def test_title_token_cuckoo_without_catalog_not_own(db):
+    # 제목 첫 토큰이 쿠쿠여도 카탈로그 코드가 없으면 자사 아님(정책: 카탈로그 전용)
     m = BrandMatcher(db).match(brand_raw="", title="쿠쿠 스피드팟 멀티쿠커", category_name="멀티쿠커")
-    assert m.is_own and m.reason in ("title", "title_brand")
+    assert not m.is_own
 
 
-def test_title_substring_cuckoo_with_code(db):
-    # 쿠쿠가 첫 토큰이 아니어도 '쿠쿠 모델코드'가 함께 있으면 자사 매칭(recall 보존)
-    m = BrandMatcher(db).match(brand_raw="", title="정품 가정용 쿠쿠 CRP-1010FD 내솥", category_name="전기밥솥")
-    assert m.is_own and m.reason == "title+modelcode"
+def test_catalog_code_anywhere_in_title_is_own(db):
+    # 카탈로그 코드가 제목 어디에 있든 자사 인정(브랜드명 없어도)
+    m = BrandMatcher(db).match(brand_raw="", title="정품 가정용 CRP-AHF1010FD 내솥", category_name="전기밥솥")
+    assert m.is_own and m.reason == "catalog"
 
 
-def test_title_substring_cuckoo_no_code_not_matched(db):
-    # 코드 없이 제목 중간 '쿠쿠'만으론 매칭 안 함(리셀러·제품명 단어 오탐 방지)
+def test_reseller_with_cuckoo_word_not_own(db):
+    # '쿠쿠풍'처럼 제품명 속 쿠쿠 + 카탈로그 코드 없음 → 자사 아님
     m = BrandMatcher(db).match(brand_raw="", title="정품 정밀 가정용 쿠쿠풍 내솥", category_name="전기밥솥")
     assert not m.is_own
 
 
-def test_modelcode_only_empty_brand(db):
-    # brand_raw 비고 토큰도 없지만 카테고리 부합 모델코드 → 자사(방법 B)
+def test_noncatalog_modelcode_not_own(db):
+    # 카탈로그에 없는 쿠쿠식 코드(CRP-DHP0610FW)는 자사 아님(휴리스틱 prefix 매칭 폐지)
     m = BrandMatcher(db).match(brand_raw="", title="CRP-DHP0610FW 화이트", category_name="전기밥솥")
-    assert m.is_own and m.reason == "modelcode+category"
+    assert not m.is_own
 
 
 def test_unknown_brand_not_own(db):
@@ -131,8 +133,9 @@ def test_second_token_cuckoo_not_own(db):
 
 
 def test_is_strong_own_filter(db):
-    # 자사 보조 검색 필터 — 카탈로그/정확 brand·maker만 True
+    # 자사 보조 검색 필터 — 카탈로그(productlist.xlsx) 매칭만 True
     mt = BrandMatcher(db)
-    assert mt.is_strong_own(brand_raw="CUCKOO", title="CUCKOO CK-C170T", maker_raw="") is True
-    assert mt.is_strong_own(brand_raw="CUCKOO스토어", title="고양이 캣타워", maker_raw="") is False
-    assert mt.is_strong_own(brand_raw="", title="만토 CUCKOO 스피커", maker_raw="") is False
+    assert mt.is_strong_own(brand_raw="CUCKOO", title="CUCKOO CRP-AHF1010FD 화이트") is True
+    assert mt.is_strong_own(brand_raw="CUCKOO", title="CUCKOO CK-XYZ999 미등록모델") is False
+    assert mt.is_strong_own(brand_raw="CUCKOO스토어", title="고양이 캣타워") is False
+    assert mt.is_strong_own(brand_raw="", title="만토 CUCKOO 스피커") is False
