@@ -186,6 +186,7 @@ export interface FilteredProduct {
   brand: string;
   capacity_band: string | null;
   sub_category: string | null;
+  off_category: boolean;
   mall: string | null;
   is_own_brand: boolean;
   is_rental: boolean;

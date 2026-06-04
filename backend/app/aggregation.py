@@ -70,11 +70,34 @@ def product_change(snaps: list[PriceSnapshot]) -> dict:
     }
 
 
+def _category_dominant_navercat(db: Session) -> dict[int, str]:
+    """카테고리별 '대표' 네이버 상위분류(category3). 다수결, 표본 5건 이상만."""
+    from collections import Counter, defaultdict
+
+    cc: dict[int, Counter] = defaultdict(Counter)
+    prods = db.scalars(
+        select(Product).where(
+            Product.is_rental.is_(False), Product.is_accessory.is_(False)
+        )
+    ).all()
+    for p in prods:
+        if p.naver_cat:
+            cc[p.category_id][p.naver_cat] += 1
+    return {cid: c.most_common(1)[0][0] for cid, c in cc.items() if sum(c.values()) >= 5}
+
+
+def is_offcategory(p: Product, dominant: dict[int, str]) -> bool:
+    """네이버 상위분류가 그 카테고리의 대표 분류와 다르면 오배치(가격 왜곡 유발)."""
+    d = dominant.get(p.category_id)
+    return bool(p.naver_cat and d and p.naver_cat != d)
+
+
 def _load_products(
     db: Session,
     is_own_only: bool,
     exclude_rental: bool = False,
     exclude_accessory: bool = False,
+    exclude_offcat: bool = False,
 ) -> list[Product]:
     stmt = select(Product)
     if is_own_only:
@@ -85,7 +108,12 @@ def _load_products(
     if exclude_accessory:
         # 부품/소모품은 본품 비교 풀에서 제외
         stmt = stmt.where(Product.is_accessory.is_(False))
-    return list(db.scalars(stmt).all())
+    products = list(db.scalars(stmt).all())
+    if exclude_offcat:
+        # 네이버 상위분류가 카테고리 대표와 다른 오배치 제품 제외(가격 평균 보호)
+        dom = _category_dominant_navercat(db)
+        products = [p for p in products if not is_offcategory(p, dom)]
+    return products
 
 
 def _dedup_by_model(rows: list[dict]) -> list[dict]:
@@ -124,7 +152,9 @@ def category_overview(db: Session, is_own_only: bool = False) -> list[dict]:
 
     렌탈 상품은 가격 왜곡 방지를 위해 집계에서 제외.
     """
-    products = _load_products(db, is_own_only, exclude_rental=True, exclude_accessory=True)
+    products = _load_products(
+        db, is_own_only, exclude_rental=True, exclude_accessory=True, exclude_offcat=True
+    )
     snaps = _snaps_by_product(db, [p.id for p in products])
 
     # 카테고리별 제품 변동 집계 (모델 단위 dedup으로 몰별 중복 제거)
@@ -461,8 +491,10 @@ def product_timeseries(db: Session, product_id: int) -> dict:
 
 
 def _category_model_prices(db: Session) -> dict[int, list[dict]]:
-    """카테고리별 (부품·렌탈 제외, 모델 dedup) 대표 제품 리스트."""
-    products = _load_products(db, is_own_only=False, exclude_rental=True, exclude_accessory=True)
+    """카테고리별 (부품·렌탈·오배치 제외, 모델 dedup) 대표 제품 리스트."""
+    products = _load_products(
+        db, is_own_only=False, exclude_rental=True, exclude_accessory=True, exclude_offcat=True
+    )
     snaps = _snaps_by_product(db, [p.id for p in products])
     raw: dict[int, list[dict]] = defaultdict(list)
     for p in products:

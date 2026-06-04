@@ -13,9 +13,27 @@ from collections import Counter
 
 from sqlalchemy import select
 
+from app import aggregation
 from app.database import SessionLocal
 from app.models import Category, Product
 from collector.brand_matcher import BrandMatcher
+
+
+def _audit_offcategory(db, cat_name: dict) -> dict:
+    """전체 제품(브랜드 무관) 오배치 점검 — 네이버 상위분류(category3)가 카테고리
+    대표와 다른 제품을 리포트. 가격 평균을 흐리는 오배치를 상시 감시한다."""
+    dom = aggregation._category_dominant_navercat(db)
+    prods = db.scalars(
+        select(Product).where(
+            Product.is_rental.is_(False), Product.is_accessory.is_(False)
+        )
+    ).all()
+    off = [p for p in prods if aggregation.is_offcategory(p, dom)]
+    by = Counter((cat_name.get(p.category_id, "?"), p.naver_cat) for p in off)
+    print(f"[audit_offcategory] 전체 본품 {len(prods)} | 오배치(네이버분류 불일치) {len(off)}")
+    for (cat, ncat), n in by.most_common(20):
+        print(f"  오배치 {cat} ⟵ 네이버 '{ncat}': {n}")
+    return {"checked": len(prods), "offcategory": len(off)}
 
 
 def audit() -> dict:
@@ -54,7 +72,14 @@ def audit() -> dict:
             print(f"  불일치 {act} → {exp}: {n}")
         for act, exp, title in mismatches[:10]:
             print(f"    예) [{act}→{exp}] {title}")
-        return {"own": len(own), "checked": checked, "mismatch": len(mismatches)}
+
+        off = _audit_offcategory(db, cat_name)  # 전체 제품 오배치(네이버분류 기준)
+        return {
+            "own": len(own),
+            "checked": checked,
+            "mismatch": len(mismatches),
+            **off,
+        }
     finally:
         db.close()
 

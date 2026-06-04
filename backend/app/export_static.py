@@ -67,6 +67,15 @@ def _all_products(db) -> list[dict]:
         if sum(cnt.values()) >= max(3, 0.4 * cat_total[cid])
     }
 
+    # 카테고리별 대표 네이버 상위분류(category3) — 오배치(off_category) 판정용
+    navercat_dist: dict[int, Counter] = defaultdict(Counter)
+    for p in products:
+        if p.naver_cat:
+            navercat_dist[p.category_id][p.naver_cat] += 1
+    dominant_navercat = {
+        cid: c.most_common(1)[0][0] for cid, c in navercat_dist.items() if sum(c.values()) >= 5
+    }
+
     rows = []
     for p in products:
         ch = aggregation.product_change(snaps.get(p.id, []))
@@ -91,6 +100,12 @@ def _all_products(db) -> list[dict]:
                 "is_rental": p.is_rental,
                 "model_key": p.model_key,
                 "sub_category": sub,
+                # 네이버 상위분류가 카테고리 대표와 다르면 오배치(가격 통계에서 제외)
+                "off_category": bool(
+                    p.naver_cat
+                    and dominant_navercat.get(p.category_id)
+                    and p.naver_cat != dominant_navercat[p.category_id]
+                ),
                 "capacity_band": aggregation._band(p),
                 "mall": aggregation._latest_mall(snaps.get(p.id, [])),
                 "current_price": ch["current_price"],

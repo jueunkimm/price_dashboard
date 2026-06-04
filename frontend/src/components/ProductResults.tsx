@@ -20,7 +20,10 @@ export default function ProductResults({
   // '전체' 모드에서 일시불가와 렌탈 월요금이 섞이면 평균이 왜곡되므로,
   // 렌탈 모드일 때만 월요금 기준으로 계산하고 그 외엔 일시불(비렌탈)만 집계.
   const stat = useMemo(() => {
-    const base = filters.pricing === "rental" ? rows : rows.filter((r) => !r.is_rental);
+    // 오배치(off_category) 제품은 가격 평균을 흐리므로 통계에서 제외
+    const base = (filters.pricing === "rental" ? rows : rows.filter((r) => !r.is_rental)).filter(
+      (r) => !r.off_category
+    );
     const prices = base.map((r) => r.current_price).sort((a, b) => a - b);
     if (!prices.length) return null;
     const sum = prices.reduce((a, b) => a + b, 0);
@@ -130,6 +133,9 @@ export default function ProductResults({
                   )}
                   {r.sub_category && (
                     <span className="text-[10px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded mr-1">{r.sub_category}</span>
+                  )}
+                  {r.off_category && (
+                    <span className="text-[10px] bg-orange-100 text-orange-600 px-1 py-0.5 rounded mr-1" title="네이버 분류가 이 카테고리와 달라 가격 통계에서 제외됨">타분류?</span>
                   )}
                   {r.model_name}
                 </td>
