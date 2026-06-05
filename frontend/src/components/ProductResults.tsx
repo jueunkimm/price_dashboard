@@ -3,6 +3,11 @@ import { api, type FilteredProduct, type ProductFilters } from "../api";
 import { won, pct, changeColor } from "../format";
 import { downloadCsv, csvBtnClass } from "../csv";
 
+// 네이버 쇼핑 CDN은 핫링크를 차단하므로 무료 이미지 프록시(weserv.nl)로 우회 + 80px 리사이즈.
+function thumb(url: string): string {
+  return `https://images.weserv.nl/?url=${encodeURIComponent(url.replace(/^https?:\/\//, ""))}&w=80&h=80&fit=cover`;
+}
+
 // 필터된 제품 결과 테이블 — 사이드바 필터 + 헤더 쿠쿠 토글 반영
 export default function ProductResults({
   filters,
@@ -136,7 +141,7 @@ export default function ProductResults({
                       >
                         {r.image_url && (
                           <img
-                            src={r.image_url}
+                            src={thumb(r.image_url)}
                             alt=""
                             loading="lazy"
                             referrerPolicy="no-referrer"
@@ -149,7 +154,7 @@ export default function ProductResults({
                       <div className="shrink-0 w-10 h-10 rounded bg-slate-100 overflow-hidden">
                         {r.image_url && (
                           <img
-                            src={r.image_url}
+                            src={thumb(r.image_url)}
                             alt=""
                             loading="lazy"
                             referrerPolicy="no-referrer"
