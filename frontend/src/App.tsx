@@ -214,6 +214,7 @@ export default function App() {
                       <DemandPanel
                         categoryId={selectedCat.category_id}
                         categoryName={selectedCat.category_name}
+                        priceChange={selectedCat.median_change_pct}
                       />
                     </section>
                   </div>

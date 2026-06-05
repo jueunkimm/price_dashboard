@@ -11,13 +11,28 @@ import {
 } from "recharts";
 import { api, type Demand } from "../api";
 
+// 시계열의 '최근 N일 평균 vs 직전 N일 평균' 변화율(%) — WoW(7)·MoM(30) 계산용
+function periodChange(series: { date: string; ratio: number }[], n: number): number | null {
+  if (series.length < n * 2) return null;
+  const s = [...series].sort((a, b) => a.date.localeCompare(b.date));
+  const recent = s.slice(-n);
+  const prior = s.slice(-n * 2, -n);
+  const avg = (a: typeof s) => a.reduce((x, p) => x + p.ratio, 0) / a.length;
+  const pr = avg(prior);
+  if (!pr) return null;
+  return Math.round(((avg(recent) - pr) / pr) * 1000) / 10;
+}
+
 // 수요 트렌드(F7) — 검색 관심도(통합검색) + 쇼핑 클릭(쇼핑인사이트)
+// ⑤ 기간비교(WoW/MoM) + ② 수요×가격 신호
 export default function DemandPanel({
   categoryId,
   categoryName,
+  priceChange,
 }: {
   categoryId: number;
   categoryName: string;
+  priceChange?: number | null; // 카테고리 중앙값 변동률(%) — 수요×가격 신호용
 }) {
   const [data, setData] = useState<Demand | null>(null);
   const [showHelp, setShowHelp] = useState(false);
@@ -39,8 +54,34 @@ export default function DemandPanel({
     return [...map.values()].sort((a, b) => a.date.localeCompare(b.date));
   }, [data]);
 
+  // ⑤ 기간비교(WoW/MoM) + ② 수요×가격 신호 — 쇼핑클릭(구매의도) 우선
+  const sig = useMemo(() => {
+    if (!data) return null;
+    const dSeries = data.shopping.length >= 14 ? data.shopping : data.search;
+    const wow = periodChange(dSeries, 7);
+    const mom = periodChange(dSeries, 30);
+    const dMom = mom ?? wow ?? 0;
+    const dUp = dMom > 5, dDown = dMom < -5;
+    const pUp = (priceChange ?? 0) > 1, pDown = (priceChange ?? 0) < -1;
+    let label = "보합", tone = "slate", desc = "수요·가격 큰 변화 없음";
+    if (dUp && pDown) { label = "🟢 기회"; tone = "emerald"; desc = "수요 상승 + 가격 하락 — 적극 대응 구간"; }
+    else if (dUp && pUp) { label = "🔵 강세"; tone = "blue"; desc = "수요·가격 동반 상승 — 프리미엄 여력"; }
+    else if (dUp) { label = "🔵 수요 상승"; tone = "blue"; desc = "수요 상승 — 주목"; }
+    else if (dDown) { label = "🔴 주의"; tone = "rose"; desc = "수요 냉각 — 재고·신제품 타이밍 주의"; }
+    return { wow, mom, dUp, dDown, label, tone, desc };
+  }, [data, priceChange]);
+
   if (!data || merged.length === 0) return null;
   const synthetic = data.is_synthetic;
+  const toneCls: Record<string, string> = {
+    emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    blue: "bg-blue-50 text-blue-700 border-blue-200",
+    rose: "bg-rose-50 text-rose-700 border-rose-200",
+    slate: "bg-slate-50 text-slate-600 border-slate-200",
+  };
+  const chgCls = (v: number | null | undefined) =>
+    v == null ? "text-slate-400" : v > 0 ? "text-emerald-600" : v < 0 ? "text-rose-500" : "text-slate-500";
+  const fmt = (v: number | null | undefined) => (v == null ? "—" : `${v > 0 ? "+" : ""}${v}%`);
 
   return (
     <div className="rounded-xl bg-white p-4 shadow-sm border border-slate-100">
@@ -62,6 +103,27 @@ export default function DemandPanel({
       <div className="text-[11px] text-slate-400 mb-2">
         검색=통합검색 관심도 · 쇼핑=네이버쇼핑 클릭(구매의도 근접)
       </div>
+
+      {/* ⑤ 기간비교 + ② 수요×가격 신호 */}
+      {sig && (
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <span className={`text-xs font-semibold px-2 py-1 rounded-lg border ${toneCls[sig.tone]}`} title={sig.desc}>
+            {sig.label}
+          </span>
+          <span className="text-[11px] text-slate-500">
+            수요 WoW <b className={chgCls(sig.wow)}>{fmt(sig.wow)}</b>
+          </span>
+          <span className="text-[11px] text-slate-500">
+            MoM <b className={chgCls(sig.mom)}>{fmt(sig.mom)}</b>
+          </span>
+          {priceChange != null && (
+            <span className="text-[11px] text-slate-500">
+              가격 <b className={chgCls(priceChange)}>{fmt(priceChange)}</b>
+            </span>
+          )}
+          <span className="text-[11px] text-slate-400 w-full">{sig.desc}</span>
+        </div>
+      )}
 
       {showHelp && (
         <div className="mb-3 rounded-lg bg-slate-50 border border-slate-100 p-3 text-[11px] text-slate-600 space-y-2">
