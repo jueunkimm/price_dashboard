@@ -3,11 +3,6 @@ import { api, type FilteredProduct, type ProductFilters } from "../api";
 import { won, pct, changeColor } from "../format";
 import { downloadCsv, csvBtnClass } from "../csv";
 
-// 네이버 쇼핑 CDN은 핫링크를 차단하므로 무료 이미지 프록시(weserv.nl)로 우회 + 80px 리사이즈.
-function thumb(url: string): string {
-  return `https://images.weserv.nl/?url=${encodeURIComponent(url.replace(/^https?:\/\//, ""))}&w=80&h=80&fit=cover`;
-}
-
 // 필터된 제품 결과 테이블 — 사이드바 필터 + 헤더 쿠쿠 토글 반영
 export default function ProductResults({
   filters,
@@ -128,43 +123,7 @@ export default function ProductResults({
                 className="border-t border-slate-50 hover:bg-slate-50 cursor-pointer align-top"
               >
                 <td className="px-3 py-2 overflow-hidden">
-                  <div className="flex items-center gap-2 min-w-0">
-                    {/* 썸네일(네이버 핫링크) — 클릭 시 상품 페이지, 깨지면 회색 박스 */}
-                    {r.link ? (
-                      <a
-                        href={r.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        title="네이버 상품 페이지 열기"
-                        className="shrink-0 w-10 h-10 rounded bg-slate-100 overflow-hidden block"
-                      >
-                        {r.image_url && (
-                          <img
-                            src={thumb(r.image_url)}
-                            alt=""
-                            loading="lazy"
-                            referrerPolicy="no-referrer"
-                            className="w-full h-full object-cover"
-                            onError={(e) => (e.currentTarget.style.display = "none")}
-                          />
-                        )}
-                      </a>
-                    ) : (
-                      <div className="shrink-0 w-10 h-10 rounded bg-slate-100 overflow-hidden">
-                        {r.image_url && (
-                          <img
-                            src={thumb(r.image_url)}
-                            alt=""
-                            loading="lazy"
-                            referrerPolicy="no-referrer"
-                            className="w-full h-full object-cover"
-                            onError={(e) => (e.currentTarget.style.display = "none")}
-                          />
-                        )}
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
+                  <div className="min-w-0">
                       <div className="flex items-center gap-1 min-w-0">
                         {r.is_own_brand && (
                           <span className="shrink-0 text-[10px] bg-own/10 text-own px-1 py-0.5 rounded">쿠쿠</span>
@@ -175,7 +134,20 @@ export default function ProductResults({
                         {r.off_category && (
                           <span className="shrink-0 text-[10px] bg-orange-100 text-orange-600 px-1 py-0.5 rounded" title="네이버 분류가 이 카테고리와 달라 가격 통계에서 제외됨">타분류?</span>
                         )}
-                        <span className="truncate">{r.model_name}</span>
+                        {r.link ? (
+                          <a
+                            href={r.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            title="네이버 상품 페이지 열기"
+                            className="truncate hover:text-own hover:underline decoration-own/40"
+                          >
+                            {r.model_name}
+                          </a>
+                        ) : (
+                          <span className="truncate">{r.model_name}</span>
+                        )}
                         {r.link && (
                           <a
                             href={r.link}
@@ -203,7 +175,6 @@ export default function ProductResults({
                         )}
                         {r.sub_category && <span className="text-slate-400">{" · "}{r.sub_category}</span>}
                       </div>
-                    </div>
                   </div>
                 </td>
                 <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{r.capacity_band ?? "—"}</td>
