@@ -179,6 +179,27 @@ export interface FilterOptions {
   price_max: number;
 }
 
+export interface ScoreItem {
+  product_id: number;
+  model_name: string;
+  brand: string;
+  is_own_brand: boolean;
+  current_price: number;
+}
+export interface Scorecard {
+  target: ScoreItem;
+  tier: string; // 동급 정의(카테고리 · 용량 · 세부유형)
+  peer_count: number;
+  rank: number; // 1 = 최저가
+  cheaper: number;
+  pricier: number;
+  median: number;
+  vs_median_pct: number; // (타깃-중앙값)/중앙값*100
+  own_count: number;
+  rival_count: number;
+  nearest: ScoreItem[]; // 가격이 가장 가까운 경쟁/동급 모델
+}
+
 export interface FilteredProduct {
   product_id: number;
   model_name: string;
@@ -378,6 +399,68 @@ export const api = {
         .sort((a, b) => a.current_price - b.current_price)
         .slice(0, 200)
     ),
+
+  // ③ 모델 경쟁 스코어카드 — 선택 제품의 동급(카테고리·용량·세부유형) 포지션
+  scorecard: (productId: number) =>
+    loadJSON<PRow[]>("products").then((rows): Scorecard | null => {
+      const clean = rows.filter((p) => !p.is_rental && !p.off_category);
+      const dd = dedup(clean); // 모델 단위 최저가 대표
+      const clicked = clean.find((p) => p.product_id === productId);
+      if (!clicked) return null;
+      const sameTier = (p: PRow) =>
+        p.category_id === clicked.category_id &&
+        (!clicked.capacity_band || p.capacity_band === clicked.capacity_band) &&
+        (!clicked.sub_category || p.sub_category === clicked.sub_category);
+      const peers = dd.filter(sameTier);
+      const target =
+        (clicked.model_key && peers.find((p) => p.model_key === clicked.model_key)) ||
+        peers.find((p) => p.product_id === productId) ||
+        clicked;
+      const prices = peers.map((p) => p.current_price).sort((a, b) => a - b);
+      const mid = Math.floor(prices.length / 2);
+      const median = prices.length
+        ? prices.length % 2
+          ? prices[mid]
+          : (prices[mid - 1] + prices[mid]) / 2
+        : target.current_price;
+      const cheaper = peers.filter((p) => p.current_price < target.current_price).length;
+      const toItem = (p: PRow): ScoreItem => ({
+        product_id: p.product_id,
+        model_name: p.model_name,
+        brand: p.brand,
+        is_own_brand: p.is_own_brand,
+        current_price: p.current_price,
+      });
+      const nearest = peers
+        .filter((p) => (target.model_key ? p.model_key !== target.model_key : p.product_id !== target.product_id))
+        .sort(
+          (a, b) =>
+            Math.abs(a.current_price - target.current_price) -
+            Math.abs(b.current_price - target.current_price)
+        )
+        .slice(0, 5)
+        .map(toItem);
+      const tier = [
+        clicked.category_name,
+        clicked.capacity_band,
+        clicked.sub_category,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      return {
+        target: toItem(target),
+        tier,
+        peer_count: peers.length,
+        rank: cheaper + 1,
+        cheaper,
+        pricier: peers.length - cheaper - 1,
+        median: Math.round(median),
+        vs_median_pct: median ? Math.round(((target.current_price - median) / median) * 1000) / 10 : 0,
+        own_count: peers.filter((p) => p.is_own_brand).length,
+        rival_count: peers.filter((p) => !p.is_own_brand).length,
+        nearest,
+      };
+    }),
 
   filterOptions: (categoryId?: number) =>
     loadJSON<PRow[]>("products").then((rows) => {

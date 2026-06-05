@@ -22,6 +22,7 @@ import BrandComparePanel from "./components/BrandComparePanel";
 import SearchBox from "./components/SearchBox";
 import FilterBar from "./components/FilterBar";
 import ProductResults from "./components/ProductResults";
+import Scorecard from "./components/Scorecard";
 
 const TODAY = "2026-06-01";
 
@@ -204,6 +205,12 @@ export default function App() {
                         <h2 className="text-sm font-semibold text-slate-500 mb-2">가격 추세</h2>
                         <TrendChart productId={selectedProduct} />
                       </div>
+                      {selectedProduct && (
+                        <div>
+                          <h2 className="text-sm font-semibold text-slate-500 mb-2">동급 경쟁 스코어카드</h2>
+                          <Scorecard productId={selectedProduct} />
+                        </div>
+                      )}
                       <DemandPanel
                         categoryId={selectedCat.category_id}
                         categoryName={selectedCat.category_name}

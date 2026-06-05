@@ -19,6 +19,7 @@ def reclassify() -> dict:
     try:
         matcher = BrandMatcher(db)
         cat_names = {c.id: c.name for c in db.scalars(select(Category)).all()}
+        name_to_id = {n: i for i, n in cat_names.items()}
         products = list(db.scalars(select(Product)).all())
 
         before_own = sum(1 for p in products if p.is_own_brand)
@@ -54,6 +55,14 @@ def reclassify() -> dict:
             if m.catalog_category_id and m.catalog_category_id != p.category_id:
                 category_moves += 1
                 p.category_id = m.catalog_category_id
+            # 폐지 카테고리 통합: 두피케어기 → 피부미용기(마사지·안마류는 안마의자·안마기)
+            if cat_names.get(p.category_id) == "두피케어기":
+                t = p.model_name or ""
+                is_massage = ("마사지" in t) or ("안마" in t) or ("마사지" in (p.naver_cat or ""))
+                target = name_to_id.get("안마의자·안마기" if is_massage else "피부미용기")
+                if target:
+                    category_moves += 1
+                    p.category_id = target
             cap_val, cap_unit, band = extract_spec(
                 cat_names.get(p.category_id), p.model_name or ""
             )
