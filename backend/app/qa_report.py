@@ -67,6 +67,8 @@ def build_qa_report(db) -> dict:
                 and not tok.isdigit()
                 and tok not in _NONBRAND
                 and not re.match(r"^[A-Z]{2,5}-", tok)  # 모델코드 제외
+                and not re.match(r"^\d", tok)  # 숫자 시작(250W·13kg 등 스펙/수량) 제외
+                and not re.search(r"(스토어|마켓|샵)$", tok)  # 리셀러(쿠쿠스토어 등) 제외
             ):
                 tok_freq[tok] += 1
                 tok_cats[tok].add(cat_name.get(p.category_id))
