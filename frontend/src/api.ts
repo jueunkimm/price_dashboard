@@ -56,6 +56,19 @@ export interface Demand {
   shopping: DemandPoint[];
 }
 
+export interface QAReport {
+  metrics: {
+    products: number;
+    unknown_brand_pct: number;
+    offcategory: number;
+    brand_candidates: number;
+    category_candidates: number;
+  };
+  brand_candidates: { brand: string; count: number; categories: string[] }[];
+  category_candidates: { naver_cat: string; count: number; samples: string[] }[];
+  offcategory: { category: string; naver_cat: string; count: number }[];
+}
+
 export interface DataQuality {
   real_collection_days: number;
   has_synthetic_price: boolean;
@@ -377,6 +390,7 @@ export const api = {
   macro: () => loadJSON<Macro>("macro"),
   report: () => loadJSON<WeeklyReport>("report"),
   dataQuality: () => loadJSON<DataQuality>("data_quality"),
+  qaReport: () => loadJSON<QAReport>("qa_report"),
 
   // 파라미터형 — products.json에서 브라우저 필터링
   products: (q: string, ownOnly: boolean, limit = 20) =>

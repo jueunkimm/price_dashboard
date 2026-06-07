@@ -16,7 +16,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
-from app import aggregation, report
+from app import aggregation, qa_report, report
 from app.database import SessionLocal
 from collector.enrich_subcategory import display_subtype
 from app.models import (
@@ -209,6 +209,7 @@ def export_all(out_dir: Path | None = None) -> dict:
         })
         _write(out, "report.json", report.weekly_report(db))
         _write(out, "data_quality.json", aggregation.data_quality(db))
+        _write(out, "qa_report.json", qa_report.build_qa_report(db))
         _write(out, "alerts.json", [
             {
                 "id": a.id, "title": a.title, "change_pct": a.change_pct,

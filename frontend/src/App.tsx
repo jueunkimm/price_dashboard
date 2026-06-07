@@ -23,6 +23,7 @@ import SearchBox from "./components/SearchBox";
 import FilterBar from "./components/FilterBar";
 import ProductResults from "./components/ProductResults";
 import Scorecard from "./components/Scorecard";
+import QAPanel from "./components/QAPanel";
 
 const TODAY = "2026-06-01";
 
@@ -155,6 +156,7 @@ export default function App() {
         {tab === "market" && (
           <div className="space-y-6">
             <FilterBar cats={cats} filters={filters} onChange={patchFilters} />
+            <QAPanel />
 
             <div className="space-y-6">
               {KpiArea}
