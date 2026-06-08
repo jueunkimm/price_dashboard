@@ -504,8 +504,9 @@ export const api = {
 
   brandComparison: (categoryId: number, f: ProductFilters = {}) =>
     loadJSON<PRow[]>("products").then((rows) => {
-      // own_only/brand는 비교 위해 미적용, 용량·몰·가격·렌탈 필터는 제품 목록과 동일
-      const items = applyFilters(rows.filter((p) => p.category_id === categoryId), {
+      // own_only/brand는 비교 위해 미적용, 용량·몰·가격·렌탈 필터는 제품 목록과 동일.
+      // 오배치(off_category)는 가격 비교를 흐리므로 제외(가스오븐레인지에 섞인 전기제품 등).
+      const items = applyFilters(rows.filter((p) => p.category_id === categoryId && !p.off_category), {
         capacity_band: f.capacity_band,
         sub_category: f.sub_category,
         mall: f.mall,

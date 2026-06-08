@@ -13,6 +13,15 @@ from app.spec import extract_spec
 from app.textutil import extract_model_key, is_accessory_title, is_rental_title
 from collector.brand_matcher import BrandMatcher
 
+# 가스 카테고리 검색이 '오븐레인지/레인지' 단어로 전기 제품을 끌어옴 →
+# 제목에 '가스'가 없으면 전기 카운터파트로 이동(가스↔전기 분리).
+_GAS_ROUTE = {
+    "가스오븐레인지": "전자레인지·오븐",
+    "가스레인지": "인덕션·전기레인지",
+}
+# 전기 제품 신호 — '가스'가 없고 이 중 하나라도 있으면 전기로 판단(가스 제품 오이동 방지)
+_ELECTRIC_SIGNALS = ("전기", "전자", "광파", "복합", "인덕션", "에어프라이", "하이라이트")
+
 
 def reclassify() -> dict:
     db = SessionLocal()
@@ -63,6 +72,16 @@ def reclassify() -> dict:
                 if target:
                     category_moves += 1
                     p.category_id = target
+            # 가스↔전기 라우팅: '가스' 카테고리에 들어온 전기 제품을 전기 카테고리로 이동.
+            # (소비자 동질성 — 빌트인 가스 대형가전과 카운터탑 전기 소형가전을 섞지 않음)
+            cur_cat = cat_names.get(p.category_id)
+            if cur_cat in _GAS_ROUTE:
+                nm = p.model_name or ""
+                if "가스" not in nm and any(s in nm for s in _ELECTRIC_SIGNALS):
+                    tid = name_to_id.get(_GAS_ROUTE[cur_cat])
+                    if tid:
+                        category_moves += 1
+                        p.category_id = tid
             cap_val, cap_unit, band = extract_spec(
                 cat_names.get(p.category_id), p.model_name or ""
             )
