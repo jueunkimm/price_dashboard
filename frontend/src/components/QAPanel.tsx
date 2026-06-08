@@ -33,8 +33,10 @@ export default function QAPanel() {
         <div className="border-t border-slate-100 px-4 py-3 grid md:grid-cols-3 gap-4 text-xs">
           {/* ① 시드 후보 브랜드 */}
           <div>
-            <div className="font-semibold text-slate-600 mb-1">시드 추가 후보 브랜드</div>
-            <div className="text-[11px] text-slate-400 mb-2">기타/미상 중 브랜드로 보이는 빈출명 (시드하면 매칭 회복)</div>
+            <div className="font-semibold text-slate-600 mb-1">시드 검토 후보 브랜드</div>
+            <div className="text-[11px] text-slate-400 mb-2">
+              교차 카테고리 고신뢰 브랜드는 <b className="text-emerald-600">자동 시드</b>됨. 아래는 단일 카테고리 등 사람 검토 필요분.
+            </div>
             <div className="space-y-1 max-h-56 overflow-auto">
               {qa.brand_candidates.length === 0 && <div className="text-slate-400">없음</div>}
               {qa.brand_candidates.map((b) => (

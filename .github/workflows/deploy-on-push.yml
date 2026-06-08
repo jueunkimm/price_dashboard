@@ -52,6 +52,7 @@ jobs:
           python -m app.seed_alerts
           python -m app.cuckoo_catalog
           python -m app.migrate
+          python -m collector.auto_seed_brands || true
           python -m collector.reclassify
           python -m collector.audit_categories || true
           python -m collector.evaluate_alerts
