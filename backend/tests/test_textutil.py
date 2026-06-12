@@ -13,6 +13,11 @@ class TestRental:
         assert is_rental_title("쿠쿠 안마의자 렌탈 레스티노 72개월약정 CMS-J310BR")
         assert is_rental_title("코웨이 CP-6201N 자가관리, 의무사용 72개월")
 
+    def test_subscription_detected(self):
+        # 구독형(월 구독료가 표시가로 잡힘)도 렌탈로 분리
+        assert is_rental_title("[구독] 쿠쿠전자 쿠쿠 통돌이 12KG 일반세탁기 CWM-ATFF1210B 블루블랙")
+        assert is_rental_title("쿠쿠 정수기 월정액 멤버십 CP-...")
+
     def test_outright_not_rental(self):
         assert not is_rental_title("쿠쿠전자 CUCKOO CRP-EHB0310FW 화이트 실버")
 

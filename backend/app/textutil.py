@@ -24,13 +24,31 @@ _RENTAL_KEYWORDS = (
     "월렌탈",
     "월 렌탈",
     "렌탈료",
+    # 구독형(월 구독료가 표시가로 잡힘) — 일시불과 분리
+    "구독",
+    "월구독",
+    "월 구독",
+    "월정액",
+    "월요금",
 )
+
+# 의무사용기간(약정) 신호: '의무36개월', '의무72' 등 — 구독/렌탈 약정
+_COMMITMENT_RE = re.compile(r"의무\s?\d+")
 
 
 def is_rental_title(title: str) -> bool:
-    """제목에 렌탈/약정 신호가 있으면 True."""
+    """제목에 렌탈/약정/구독 신호가 있으면 True.
+
+    주의: '구독권'(꽃 구독권 등 사은품 번들)·'멤버십적립'(적립 할인)은
+    구독형 제품이 아니므로 오탐 방지를 위해 제외한다.
+    """
     t = title or ""
-    return any(k in t for k in _RENTAL_KEYWORDS)
+    probe = t.replace("구독권", "")  # 번들 사은품 '구독권' 제거 후 검사
+    if any(k in probe for k in _RENTAL_KEYWORDS):
+        return True
+    if _COMMITMENT_RE.search(t):
+        return True
+    return False
 
 
 # 부품/소모품/악세서리 신호 — 본품이 아닌 항목(비교 풀에서 제외)
