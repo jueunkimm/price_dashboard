@@ -54,6 +54,7 @@ jobs:
           python -m app.migrate
           python -m collector.auto_seed_brands || true
           python -m collector.reclassify
+          python -m collector.recategorize
           python -m collector.audit_categories || true
           python -m collector.evaluate_alerts
           python -m app.export_static
