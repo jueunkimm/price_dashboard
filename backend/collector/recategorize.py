@@ -58,6 +58,7 @@ def recategorize() -> dict:
     db = SessionLocal()
     try:
         cat_names = {c.id: c.name for c in db.scalars(select(Category)).all()}
+        name_to_id = {n: i for i, n in cat_names.items()}
         cat_ids = set(cat_names)
         prods = db.scalars(
             select(Product).where(

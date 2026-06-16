@@ -62,6 +62,21 @@ def test_routes_misplaced_and_protects_junk_and_correct(session):
     assert res["moves"] == 1
 
 
+def test_title_type_routing_moves_cross_type(session):
+    # 제목 배타적 유형 라우팅 — naver_cat 없이도 명백한 오배치 교정(NameError 회귀 방지)
+    db = session()
+    db.add_all([Category(id=1, name="면도기"), Category(id=2, name="전기밥솥")])
+    rows = [_p(1, None, f"브라운 전기면도기 {i}") for i in range(5)]
+    bug = _p(1, None, "쿠쿠 IH 압력밥솥 2기압 /2인용/3인용/미니/쾌속취사")  # naver_cat=None
+    rows.append(bug)
+    db.add_all(rows)
+    db.commit()
+
+    res = rc.recategorize()
+    assert session().get(Product, bug.id).category_id == 2  # 면도기 → 전기밥솥
+    assert res["type_moves"] >= 1
+
+
 def test_ambiguous_navercat_not_routed(session):
     db = session()
     db.add_all([Category(id=1, name="A"), Category(id=2, name="B"), Category(id=3, name="C")])
