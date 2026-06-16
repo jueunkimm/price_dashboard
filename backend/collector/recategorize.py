@@ -26,6 +26,7 @@ from collections import Counter, defaultdict
 
 from sqlalchemy import select
 
+from app.category_signals import route_target
 from app.database import SessionLocal
 from app.models import Category, Product
 
@@ -67,10 +68,27 @@ def recategorize() -> dict:
 
         dominant, owner = _build_authority(prods, cat_ids)
 
+        tracked = set(cat_names.values())
         moves = 0
+        type_moves = 0
         by_move: Counter = Counter()
         examples: list[str] = []
         for p in prods:
+            src_name = cat_names.get(p.category_id, "?")
+            # (1) 제목 배타적 제품유형 라우팅 — 모델코드·naver_cat 없이도 명백한 오배치 교정
+            #     (예: '쿠쿠 면도기' 보조검색에 섞인 쿠쿠 압력밥솥 → 전기밥솥)
+            tname = route_target(p.model_name or "", src_name, tracked)
+            if tname and tname != src_name:
+                tid = name_to_id.get(tname)
+                if tid:
+                    p.category_id = tid
+                    moves += 1
+                    type_moves += 1
+                    by_move[(src_name, tname)] += 1
+                    if len(examples) < 12:
+                        examples.append(f"[유형][{src_name}→{tname}] {(p.model_name or '')[:42]}")
+                    continue
+            # (2) 네이버분류 소유권 라우팅
             nc = p.naver_cat
             if not nc:
                 continue
@@ -80,17 +98,17 @@ def recategorize() -> dict:
             # 지금 카테고리에 '맞으면'(대표분류와 일치) 이동하지 않음 — 정배치 보호
             if dominant.get(p.category_id) == nc:
                 continue
-            src_name = cat_names.get(p.category_id, "?")
             tgt_name = cat_names.get(tgt, "?")
             p.category_id = tgt
             moves += 1
             by_move[(src_name, tgt_name)] += 1
             if len(examples) < 12:
-                examples.append(f"[{src_name}→{tgt_name}] {(p.model_name or '')[:46]}")
+                examples.append(f"[분류][{src_name}→{tgt_name}] {(p.model_name or '')[:42]}")
         db.commit()
 
         print(
-            f"[recategorize] 본품 {len(prods)} | 소유권 매핑 {len(owner)} | 자동이동 {moves}"
+            f"[recategorize] 본품 {len(prods)} | 소유권 매핑 {len(owner)} | "
+            f"자동이동 {moves}(제목유형 {type_moves} + 네이버분류 {moves - type_moves})"
         )
         for (src, tgt), n in by_move.most_common(20):
             print(f"  이동 {src} → {tgt}: {n}")
@@ -100,6 +118,7 @@ def recategorize() -> dict:
             "checked": len(prods),
             "owner_maps": len(owner),
             "moves": moves,
+            "type_moves": type_moves,
             "by_move": {f"{s}→{t}": n for (s, t), n in by_move.items()},
             "examples": examples,
         }

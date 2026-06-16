@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
+from app.category_signals import route_target
 from app.config import settings
 from app.database import Base, SessionLocal, engine
 from app.models import Category, CollectionLog, PriceSnapshot, Product
@@ -95,6 +96,7 @@ def run_collection(display: int | None = None) -> dict:
         categories = list(
             db.scalars(select(Category).where(Category.level == 2)).all()
         )
+        tracked_names = {c.name for c in categories}
         for cat in categories:
             keyword = cat.search_keyword or cat.name
             try:
@@ -125,6 +127,18 @@ def run_collection(display: int | None = None) -> dict:
                     seen_ids.add(eid)
                 deduped.append(it)
             items = deduped
+
+            # 카테고리 정합성 가드(오배치 차단) — 검색어와 무관한 타유형 제품을 이 카테고리에
+            # 적재하지 않음(예: '쿠쿠 면도기' 보조검색 결과의 쿠쿠 압력밥솥). 해당 제품은
+            # 자기 카테고리 검색에서 정상 수집된다. route_target은 고정밀(오교정 0)이라 안전.
+            before_guard = len(items)
+            items = [
+                it for it in items
+                if route_target(it.get("title", ""), cat.name, tracked_names) is None
+            ]
+            blocked = before_guard - len(items)
+            if blocked:
+                print(f"[collect] {cat.name}: 정합성 가드로 {blocked}건 차단")
 
             for item in items:
                 product = _upsert_product(db, cat.id, item, matcher, category_name=cat.name)

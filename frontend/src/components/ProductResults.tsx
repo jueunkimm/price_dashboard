@@ -15,6 +15,14 @@ export default function ProductResults({
 }) {
   const [rows, setRows] = useState<FilteredProduct[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showOff, setShowOff] = useState(false); // 타분류 추정(off_category) 표시 여부
+
+  // 기본은 오배치(off_category)를 숨겨 목록 신뢰도를 높이고, 토글로 투명하게 확인 가능.
+  const offCount = useMemo(() => rows.filter((r) => r.off_category).length, [rows]);
+  const visible = useMemo(
+    () => (showOff ? rows : rows.filter((r) => !r.off_category)),
+    [rows, showOff]
+  );
 
   // 현재 필터 결과의 가격 요약(평균·중앙값·최저·최고).
   // '전체' 모드에서 일시불가와 렌탈 월요금이 섞이면 평균이 왜곡되므로,
@@ -51,9 +59,20 @@ export default function ProductResults({
 
   return (
     <div className="rounded-xl bg-white border border-slate-100 shadow-sm">
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-slate-50">
-        <span className="text-xs text-slate-400">{loading ? "조회 중…" : `${rows.length}건`}</span>
-        {rows.length > 0 && (
+      <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-slate-50">
+        <span className="flex items-center gap-2 min-w-0">
+          <span className="text-xs text-slate-400 shrink-0">{loading ? "조회 중…" : `${visible.length}건`}</span>
+          {offCount > 0 && (
+            <button
+              onClick={() => setShowOff((v) => !v)}
+              className="text-[11px] text-orange-500 hover:underline shrink-0"
+              title="네이버 분류가 이 카테고리와 달라 오배치로 추정되는 제품"
+            >
+              {showOff ? `타분류 추정 ${offCount}건 숨기기` : `타분류 추정 ${offCount}건 보기`}
+            </button>
+          )}
+        </span>
+        {visible.length > 0 && (
           <button
             onClick={() =>
               downloadCsv(
@@ -68,7 +87,7 @@ export default function ProductResults({
                   { key: "current_price", label: "현재가" },
                   { key: "change_pct", label: "변동률(%)" },
                 ],
-                rows
+                visible
               )
             }
             className={csvBtnClass}
@@ -100,9 +119,13 @@ export default function ProductResults({
         </div>
       )}
 
-      {rows.length === 0 ? (
+      {visible.length === 0 ? (
         <div className="py-12 text-center text-slate-400 text-sm">
-          {loading ? "불러오는 중…" : "조건에 맞는 제품이 없습니다."}
+          {loading
+            ? "불러오는 중…"
+            : offCount > 0
+            ? "표시할 제품이 없습니다(타분류 추정 제외). 위 ‘보기’로 확인하세요."
+            : "조건에 맞는 제품이 없습니다."}
         </div>
       ) : (
         <div className="max-h-[60vh] overflow-auto rounded-b-xl">
@@ -116,7 +139,7 @@ export default function ProductResults({
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {visible.map((r) => (
               <tr
                 key={r.product_id}
                 onClick={() => onSelect(r.product_id)}
