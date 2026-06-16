@@ -169,6 +169,8 @@ def category_overview(db: Session, is_own_only: bool = False) -> list[dict]:
     }
 
     cats = {c.id: c for c in db.scalars(select(Category).where(Category.level == 2)).all()}
+    # 대분류(level=1) 이름 — 프론트 그룹핑/탐색용
+    groups = {c.id: c.name for c in db.scalars(select(Category).where(Category.level == 1)).all()}
     # 자사 라인업(★)은 정적 시드 플래그가 아니라 '실제 매칭된 자사 제품 ≥1건'으로 판정.
     # 쿠쿠홈시스 라인업 확장(냉장고·세탁기·에어컨 등) 같은 변화를 수집 데이터가 자동 반영.
     own_cat_ids = set(
@@ -192,6 +194,7 @@ def category_overview(db: Session, is_own_only: bool = False) -> list[dict]:
             {
                 "category_id": cat_id,
                 "category_name": cat.name,
+                "group": groups.get(cat.parent_id, "기타"),
                 "has_own_lineup": cat_id in own_cat_ids,
                 "product_count": len(rows),
                 "avg_price": round(statistics.mean(prices)),

@@ -3,6 +3,7 @@
 export interface CategoryOverview {
   category_id: number;
   category_name: string;
+  group: string;
   has_own_lineup: boolean;
   product_count: number;
   avg_price: number;

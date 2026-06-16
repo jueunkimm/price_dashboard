@@ -7,7 +7,9 @@ import {
   type RankingRow,
 } from "./api";
 import KpiBar from "./components/KpiBar";
-import CategoryGrid from "./components/CategoryGrid";
+import CategoryNav from "./components/CategoryNav";
+import OwnLineupSummary from "./components/OwnLineupSummary";
+import SignalStrip from "./components/SignalStrip";
 import MovementTable from "./components/MovementTable";
 import TrendChart from "./components/TrendChart";
 import PositioningPanel from "./components/PositioningPanel";
@@ -187,6 +189,8 @@ export default function App() {
                     </button>
                   </div>
 
+                  <SignalStrip cat={selectedCat} />
+
                   <BrandComparePanel
                     categoryId={selectedCat.category_id}
                     categoryName={selectedCat.category_name}
@@ -224,13 +228,19 @@ export default function App() {
               ) : (
                 // ── 전체 개요(카테고리 미선택) ──
                 <>
+                  <OwnLineupSummary
+                    cats={cats}
+                    selectedId={filters.category_id ?? null}
+                    onSelect={(c) => patchFilters({ category_id: c.category_id })}
+                  />
+
                   <ReportPanel />
 
                   <section>
                     <h2 className="text-sm font-semibold text-slate-500 mb-2">
-                      카테고리 현황
+                      카테고리 탐색
                       <span className="ml-2 text-xs font-normal text-slate-400">
-                        카드 또는 왼쪽 필터로 카테고리 선택 → 상세
+                        검색·그룹으로 품목 선택 → 상세
                       </span>
                     </h2>
                     {loading && cats.length === 0 ? (
@@ -243,7 +253,7 @@ export default function App() {
                         ))}
                       </div>
                     ) : (
-                      <CategoryGrid
+                      <CategoryNav
                         cats={cats}
                         selectedId={filters.category_id ?? null}
                         onSelect={(c) => patchFilters({ category_id: c?.category_id })}
