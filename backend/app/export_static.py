@@ -158,6 +158,38 @@ def _demand(db) -> dict:
     return out
 
 
+def _catalog_diag(db) -> dict:
+    """CI 환경의 카탈로그/라우팅 상태 진단(로그 접근 불가 대체). 배포 후 _diag.json으로 확인."""
+    from app.models import CuckooModel
+    from collector.brand_matcher import BrandMatcher
+
+    cms = list(db.scalars(select(CuckooModel)).all())
+    mapped = sum(1 for cm in cms if cm.mapped_category_id)
+    cat_names = {c.id: c.name for c in db.scalars(select(Category)).all()}
+    try:
+        m = BrandMatcher(db)
+        probe = {}
+        for code in ("쿠쿠 전기레인지 CIHR-FL302FB", "쿠쿠 인덕션 CIR-EP301FW"):
+            auth = m.authoritative_category(code)
+            probe[code] = cat_names.get(auth) if auth else None
+    except Exception as e:  # noqa: BLE001
+        probe = {"error": str(e)}
+    yo = db.scalar(select(Category).where(Category.name == "요거트제조기"))
+    yo_bad = 0
+    if yo:
+        for p in db.scalars(select(Product).where(Product.category_id == yo.id)).all():
+            t = p.model_name or ""
+            if "인덕션" in t or "전기레인지" in t:
+                yo_bad += 1
+    return {
+        "cuckoo_models": len(cms),
+        "mapped_to_category": mapped,
+        "authoritative_probe": probe,
+        "yogurt_induction_count": yo_bad,
+        "categories_level2": sum(1 for c in cat_names.values()),
+    }
+
+
 def export_all(out_dir: Path | None = None) -> dict:
     out = out_dir or DEFAULT_OUT
     out.mkdir(parents=True, exist_ok=True)
@@ -210,6 +242,7 @@ def export_all(out_dir: Path | None = None) -> dict:
         _write(out, "report.json", report.weekly_report(db))
         _write(out, "data_quality.json", aggregation.data_quality(db))
         _write(out, "qa_report.json", qa_report.build_qa_report(db))
+        _write(out, "_diag.json", _catalog_diag(db))
         _write(out, "alerts.json", [
             {
                 "id": a.id, "title": a.title, "change_pct": a.change_pct,
