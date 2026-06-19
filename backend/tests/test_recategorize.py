@@ -11,7 +11,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
-from app.models import Category, Product
+from app.models import Category, CuckooModel, Product
 from collector import recategorize as rc
 
 
@@ -75,6 +75,21 @@ def test_title_type_routing_moves_cross_type(session):
     res = rc.recategorize()
     assert session().get(Product, bug.id).category_id == 2  # 면도기 → 전기밥솥
     assert res["type_moves"] >= 1
+
+
+def test_catalog_code_routing_moves_cuckoo_by_code(session):
+    # 쿠쿠 모델코드(CIR-) 권위로 오배치 교정 — '쿠쿠 요거트제조기' 결과의 쿠쿠 인덕션
+    db = session()
+    db.add_all([Category(id=1, name="요거트제조기"), Category(id=2, name="인덕션·전기레인지")])
+    db.add(CuckooModel(model_code="CIR-EP301FW", base_code="CIR-EP301FW",
+                       product_group="인덕션레인지", mapped_category_id=2, is_accessory=False))
+    bug = _p(1, None, "쿠쿠 3구 셰프스틱 인덕션 화이트 CIR-EP301FW")
+    db.add(bug)
+    db.commit()
+
+    res = rc.recategorize()
+    assert session().get(Product, bug.id).category_id == 2  # 요거트제조기 → 인덕션·전기레인지
+    assert res["code_moves"] >= 1
 
 
 def test_ambiguous_navercat_not_routed(session):

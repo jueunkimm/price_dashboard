@@ -98,6 +98,17 @@ class BrandMatcher:
                 return cid
         return None
 
+    def authoritative_category(self, title: str) -> int | None:
+        """제목의 쿠쿠 모델코드가 가리키는 권위 카테고리(카탈로그 > prefix). 없으면 None.
+
+        카테고리 교정/수집가드 공용 — '쿠쿠 요거트제조기' 보조검색에 섞인 쿠쿠 인덕션
+        (CIR-/CIHR-)처럼 코드가 명확한 제품을 올바른 카테고리로 보내거나 차단한다.
+        """
+        cc = self._catalog_lookup(title)
+        if cc is not None and cc[0] is not None:
+            return cc[0]
+        return self._prefix_category_of(title)
+
     def is_strong_own(self, brand_raw: str = "", title: str = "", maker_raw: str = "") -> bool:
         """자사 보조 검색('쿠쿠 {카테고리}') 결과 필터용 — 진짜 쿠쿠만 True.
 

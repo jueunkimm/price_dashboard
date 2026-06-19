@@ -29,6 +29,7 @@ from sqlalchemy import select
 from app.category_signals import route_target
 from app.database import SessionLocal
 from app.models import Category, Product
+from collector.brand_matcher import BrandMatcher
 
 MIN_SAMPLE = 5  # 카테고리 대표 네이버분류 판정 최소 표본(aggregation과 동일)
 
@@ -68,14 +69,28 @@ def recategorize() -> dict:
         ).all()
 
         dominant, owner = _build_authority(prods, cat_ids)
+        matcher = BrandMatcher(db)
 
         tracked = set(cat_names.values())
         moves = 0
         type_moves = 0
+        code_moves = 0
         by_move: Counter = Counter()
         examples: list[str] = []
         for p in prods:
             src_name = cat_names.get(p.category_id, "?")
+            # (0) 카탈로그 코드 권위 라우팅 — 쿠쿠 모델코드(CIR-/CRP- 등)가 가리키는
+            #     공식 카테고리로 이동(예: '쿠쿠 요거트제조기' 결과의 쿠쿠 인덕션 CIR- → 인덕션·전기레인지)
+            auth = matcher.authoritative_category(p.model_name or "")
+            if auth and auth != p.category_id and auth in cat_names:
+                tgt_name = cat_names[auth]
+                p.category_id = auth
+                moves += 1
+                code_moves += 1
+                by_move[(src_name, tgt_name)] += 1
+                if len(examples) < 12:
+                    examples.append(f"[코드][{src_name}→{tgt_name}] {(p.model_name or '')[:42]}")
+                continue
             # (1) 제목 배타적 제품유형 라우팅 — 모델코드·naver_cat 없이도 명백한 오배치 교정
             #     (예: '쿠쿠 면도기' 보조검색에 섞인 쿠쿠 압력밥솥 → 전기밥솥)
             tname = route_target(p.model_name or "", src_name, tracked)
@@ -108,8 +123,8 @@ def recategorize() -> dict:
         db.commit()
 
         print(
-            f"[recategorize] 본품 {len(prods)} | 소유권 매핑 {len(owner)} | "
-            f"자동이동 {moves}(제목유형 {type_moves} + 네이버분류 {moves - type_moves})"
+            f"[recategorize] 본품 {len(prods)} | 소유권 매핑 {len(owner)} | 자동이동 {moves}"
+            f"(코드 {code_moves} + 제목유형 {type_moves} + 네이버분류 {moves - type_moves - code_moves})"
         )
         for (src, tgt), n in by_move.most_common(20):
             print(f"  이동 {src} → {tgt}: {n}")
@@ -119,6 +134,7 @@ def recategorize() -> dict:
             "checked": len(prods),
             "owner_maps": len(owner),
             "moves": moves,
+            "code_moves": code_moves,
             "type_moves": type_moves,
             "by_move": {f"{s}→{t}": n for (s, t), n in by_move.items()},
             "examples": examples,

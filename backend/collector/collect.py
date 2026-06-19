@@ -137,11 +137,21 @@ def run_collection(display: int | None = None) -> dict:
             # 적재하지 않음(예: '쿠쿠 면도기' 보조검색 결과의 쿠쿠 압력밥솥). 해당 제품은
             # 자기 카테고리 검색에서 정상 수집된다. route_target은 고정밀(오교정 0)이라 안전.
             before_guard = len(items)
-            items = [
-                it for it in items
-                if not is_reseller_spam(it.get("title", ""))           # 리셀러 잡화 차단
-                and route_target(it.get("title", ""), cat.name, tracked_names) is None
-            ]
+
+            def _belongs(it) -> bool:
+                title = it.get("title", "")
+                if is_reseller_spam(title):                       # 리셀러 잡화 차단
+                    return False
+                # 쿠쿠 모델코드가 다른 카테고리를 가리키면 차단(예: 보조검색의 쿠쿠 인덕션)
+                auth = matcher.authoritative_category(title)
+                if auth and auth != cat.id:
+                    return False
+                # 제목 배타적 제품유형이 다른 카테고리면 차단(예: 압력밥솥)
+                if route_target(title, cat.name, tracked_names) is not None:
+                    return False
+                return True
+
+            items = [it for it in items if _belongs(it)]
             blocked = before_guard - len(items)
             if blocked:
                 print(f"[collect] {cat.name}: 정합성 가드로 {blocked}건 차단")
