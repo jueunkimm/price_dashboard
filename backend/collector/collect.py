@@ -15,7 +15,12 @@ from app.config import settings
 from app.database import Base, SessionLocal, engine
 from app.models import Category, CollectionLog, PriceSnapshot, Product
 from app.spec import extract_spec
-from app.textutil import extract_model_key, is_accessory_title, is_rental_title
+from app.textutil import (
+    extract_model_key,
+    is_accessory_title,
+    is_rental_title,
+    is_reseller_spam,
+)
 from collector.brand_matcher import BrandMatcher
 from collector.naver_client import NaverShopClient
 
@@ -134,7 +139,8 @@ def run_collection(display: int | None = None) -> dict:
             before_guard = len(items)
             items = [
                 it for it in items
-                if route_target(it.get("title", ""), cat.name, tracked_names) is None
+                if not is_reseller_spam(it.get("title", ""))           # 리셀러 잡화 차단
+                and route_target(it.get("title", ""), cat.name, tracked_names) is None
             ]
             blocked = before_guard - len(items)
             if blocked:

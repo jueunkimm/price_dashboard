@@ -98,6 +98,19 @@ def is_accessory_title(title: str) -> bool:
     return any(k in t for k in _ACCESSORY_KEYWORDS)
 
 
+# 리셀러(드롭십) 스팸 — '쿠쿠' 브랜드 검색에 딸려오지만 카테고리와 무관한 잡화를
+# 스팸성 다중키워드 제목으로 파는 재판매몰. 자사도 본품도 아니어서 비교를 흐린다.
+# (예: '쿠쿠스토어 사이클링 양말…', '쿠쿠스토어 면도기 걸이 랙…')
+# 진짜 쿠쿠 제품은 '쿠쿠전자/쿠쿠홈시스'이지 '쿠쿠스토어'가 아니므로 오제외 위험 없음.
+_RESELLER_MARKERS = ("쿠쿠스토어",)
+
+
+def is_reseller_spam(title: str) -> bool:
+    """알려진 리셀러(드롭십) 잡화 제목이면 True — 비교 풀에서 제외."""
+    n = (title or "").replace(" ", "")
+    return any(m in n for m in _RESELLER_MARKERS)
+
+
 # 모델코드: 알파벳 prefix + 하이픈 + 영숫자 (CRP-LHTR1010FGWM)
 _MODEL_CODE_RE = re.compile(r"\b([A-Z]{2,5}-[A-Z0-9]{3,})")
 

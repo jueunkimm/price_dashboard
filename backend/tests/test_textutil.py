@@ -22,6 +22,20 @@ class TestRental:
         assert not is_rental_title("쿠쿠전자 CUCKOO CRP-EHB0310FW 화이트 실버")
 
 
+class TestResellerSpam:
+    def test_reseller_spam_detected(self):
+        from app.textutil import is_reseller_spam
+        assert is_reseller_spam("쿠쿠스토어 새로운 UAE 사이클링 양말 FDJ 운동 미끄럼 방지")
+        assert is_reseller_spam("쿠쿠스토어 고데기 내열 매트 및 장갑 - 모발 보호")
+        assert is_reseller_spam("쿠쿠 스토어 면도기 걸이 랙 투명 보관 선반")  # 공백 변형
+
+    def test_real_cuckoo_not_spam(self):
+        from app.textutil import is_reseller_spam
+        # 진짜 쿠쿠는 쿠쿠전자/쿠쿠홈시스 — '쿠쿠스토어' 아님
+        assert not is_reseller_spam("쿠쿠전자 CUCKOO CRP-EHB0310FW 화이트")
+        assert not is_reseller_spam("쿠쿠홈시스 정수기 CP-TS011S")
+
+
 class TestAccessory:
     def test_accessory_detected(self):
         assert is_accessory_title("쿠쿠 밥솥 호환 고무패킹 내솥")

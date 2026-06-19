@@ -10,7 +10,12 @@ from sqlalchemy import select
 from app.database import SessionLocal
 from app.models import Category, Product
 from app.spec import extract_spec
-from app.textutil import extract_model_key, is_accessory_title, is_rental_title
+from app.textutil import (
+    extract_model_key,
+    is_accessory_title,
+    is_rental_title,
+    is_reseller_spam,
+)
 from collector.brand_matcher import BrandMatcher
 
 # 가스 카테고리 검색이 '오븐레인지/레인지' 단어로 전기 제품을 끌어옴 →
@@ -57,8 +62,12 @@ def reclassify() -> dict:
             p.is_own_brand = new_is_own
             p.brand_id = m.brand_id
             p.is_rental = is_rental_title(p.model_name or "")
-            # 별매품: 제목 신호 OR 공식 카탈로그 별매품
-            p.is_accessory = is_accessory_title(p.model_name or "") or m.catalog_accessory
+            # 별매품: 제목 신호 OR 공식 카탈로그 별매품 OR 리셀러 잡화(비교 제외)
+            p.is_accessory = (
+                is_accessory_title(p.model_name or "")
+                or m.catalog_accessory
+                or is_reseller_spam(p.model_name or "")
+            )
             p.model_key = extract_model_key(p.model_name or "")
             # 카테고리 교정: 카탈로그(또는 카탈로그 기반 prefix 권위)가 카테고리를 주면 이동
             if m.catalog_category_id and m.catalog_category_id != p.category_id:
