@@ -79,18 +79,22 @@ def recategorize() -> dict:
         examples: list[str] = []
         for p in prods:
             src_name = cat_names.get(p.category_id, "?")
-            # (0) 카탈로그 코드 권위 라우팅 — 쿠쿠 모델코드(CIR-/CRP- 등)가 가리키는
-            #     공식 카테고리로 이동(예: '쿠쿠 요거트제조기' 결과의 쿠쿠 인덕션 CIR- → 인덕션·전기레인지)
+            # (0) 카탈로그 코드 권위 — 쿠쿠 모델코드(CIR-/CRP- 등)가 가리키는 공식 카테고리.
+            #     코드 권위가 있으면 그 카테고리로 '고정'한다: 이미 맞으면 그대로 두되,
+            #     아래 제목유형/네이버분류 라우터가 절대 건드리지 못하게 continue.
+            #     (네이버분류가 출처 리스팅에서 오기입돼도 코드가 이김 — 예: '쿠쿠 요거트제조기'
+            #      검색에 섞인 쿠쿠 인덕션 CIR-가 naver_cat 오기입으로 요거트로 되돌아가는 것 방지)
             auth = matcher.authoritative_category(p.model_name or "")
-            if auth and auth != p.category_id and auth in cat_names:
-                tgt_name = cat_names[auth]
-                p.category_id = auth
-                moves += 1
-                code_moves += 1
-                by_move[(src_name, tgt_name)] += 1
-                if len(examples) < 12:
-                    examples.append(f"[코드][{src_name}→{tgt_name}] {(p.model_name or '')[:42]}")
-                continue
+            if auth and auth in cat_names:
+                if auth != p.category_id:
+                    tgt_name = cat_names[auth]
+                    p.category_id = auth
+                    moves += 1
+                    code_moves += 1
+                    by_move[(src_name, tgt_name)] += 1
+                    if len(examples) < 12:
+                        examples.append(f"[코드][{src_name}→{tgt_name}] {(p.model_name or '')[:42]}")
+                continue  # 코드 권위 제품은 다른 라우터가 건드리지 않음(고정)
             # (1) 제목 배타적 제품유형 라우팅 — 모델코드·naver_cat 없이도 명백한 오배치 교정
             #     (예: '쿠쿠 면도기' 보조검색에 섞인 쿠쿠 압력밥솥 → 전기밥솥)
             tname = route_target(p.model_name or "", src_name, tracked)

@@ -92,6 +92,28 @@ def test_catalog_code_routing_moves_cuckoo_by_code(session):
     assert res["code_moves"] >= 1
 
 
+def test_catalog_code_pins_against_mistagged_navercat(session):
+    # 핵심 회귀: 카탈로그 코드가 가리키는 카테고리에 정배치된 제품을, 출처가 오기입한
+    # naver_cat 소유권 라우터가 '되돌리지' 못해야 한다(코드 권위 우선·고정).
+    db = session()
+    db.add_all([Category(id=1, name="요거트제조기"), Category(id=2, name="인덕션·전기레인지")])
+    db.add(CuckooModel(model_code="CIR-EP301FW", base_code="CIR-EP301FW",
+                       product_group="인덕션레인지", mapped_category_id=2, is_accessory=False))
+    rows = []
+    # 요거트제조기가 'naver주방가전'을 단독 소유(표본 5)
+    rows += [_p(1, "naver주방가전", f"요거트메이커 {i}") for i in range(5)]
+    # 인덕션 카테고리 대표분류는 다른 것
+    rows += [_p(2, "naver전기레인지", f"전기레인지 {i}") for i in range(5)]
+    # 정배치된 쿠쿠 인덕션(코드 보유)인데 naver_cat이 요거트 소유 분류로 '오기입'됨
+    pinned = _p(2, "naver주방가전", "쿠쿠 3구 셰프스틱 인덕션 화이트 CIR-EP301FW")
+    rows.append(pinned)
+    db.add_all(rows)
+    db.commit()
+
+    rc.recategorize()
+    assert session().get(Product, pinned.id).category_id == 2  # 코드 권위로 고정(요거트로 안 돌아감)
+
+
 def test_ambiguous_navercat_not_routed(session):
     db = session()
     db.add_all([Category(id=1, name="A"), Category(id=2, name="B"), Category(id=3, name="C")])

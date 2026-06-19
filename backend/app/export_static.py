@@ -158,58 +158,6 @@ def _demand(db) -> dict:
     return out
 
 
-def _catalog_diag(db) -> dict:
-    """CI 환경의 카탈로그/라우팅 상태 진단(로그 접근 불가 대체). 배포 후 _diag.json으로 확인."""
-    from app.models import CuckooModel
-    from collector.brand_matcher import BrandMatcher
-
-    from collections import defaultdict
-
-    cms = list(db.scalars(select(CuckooModel)).all())
-    mapped = sum(1 for cm in cms if cm.mapped_category_id)
-    cats = list(db.scalars(select(Category)).all())
-    cat_names = {c.id: c.name for c in cats}
-    # 중복 카테고리명(캐시 DB 누적) 점검
-    by_name: dict = defaultdict(list)
-    for c in cats:
-        by_name[c.name].append(c.id)
-    dups = {n: ids for n, ids in by_name.items() if len(ids) > 1}
-
-    m = BrandMatcher(db)
-    own_brand_id = m._own_brand.id if m._own_brand else None
-    # 막힌 두 제품의 실제 상태 + match()/authoritative 결과
-    stuck = []
-    for code in ("CIHR-FL302FB", "CIR-EP301FW"):
-        for p in db.scalars(
-            select(Product).where(Product.model_name.like(f"%{code}%"))
-        ).all():
-            try:
-                mr = m.match(brand_raw=p.brand_raw or "", title=p.model_name or "")
-                cc = mr.catalog_category_id
-            except Exception as e:  # noqa: BLE001
-                cc = f"ERR:{e}"
-            try:
-                auth = m.authoritative_category(p.model_name or "")
-            except Exception as e:  # noqa: BLE001
-                auth = f"ERR:{e}"
-            stuck.append({
-                "code": code,
-                "cur_cat": cat_names.get(p.category_id),
-                "cur_cat_id": p.category_id,
-                "is_own": p.is_own_brand,
-                "match_catalog_cat": cat_names.get(cc) if isinstance(cc, int) else cc,
-                "auth_cat": cat_names.get(auth) if isinstance(auth, int) else auth,
-            })
-    return {
-        "cuckoo_models": len(cms),
-        "mapped_to_category": mapped,
-        "own_brand_id": own_brand_id,
-        "duplicate_categories": dups,
-        "total_categories": len(cats),
-        "stuck_products": stuck,
-    }
-
-
 def export_all(out_dir: Path | None = None) -> dict:
     out = out_dir or DEFAULT_OUT
     out.mkdir(parents=True, exist_ok=True)
@@ -262,7 +210,6 @@ def export_all(out_dir: Path | None = None) -> dict:
         _write(out, "report.json", report.weekly_report(db))
         _write(out, "data_quality.json", aggregation.data_quality(db))
         _write(out, "qa_report.json", qa_report.build_qa_report(db))
-        _write(out, "_diag.json", _catalog_diag(db))
         _write(out, "alerts.json", [
             {
                 "id": a.id, "title": a.title, "change_pct": a.change_pct,
