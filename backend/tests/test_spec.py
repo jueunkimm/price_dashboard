@@ -59,3 +59,37 @@ class TestCategoryAwareExtraction:
         assert band_for(65.0, "형") == "65형"
         assert band_for(3.0, "구") == "3구"
         assert band_for(None, None) is None
+
+
+class TestExpandedUnits:
+    def test_wine_cellar_bottles(self):
+        v, u, b = extract_spec("와인셀러", "캐리어 와인셀러 32병 스탠드형")
+        assert u == "병" and b == "19~50병"
+        assert extract_spec("와인셀러", "소형 와인냉장고 12병")[2] == "~18병"
+
+    def test_frypan_cm(self):
+        v, u, b = extract_spec("전기프라이팬", "키친아트 전기그릴팬 28cm 양면")
+        assert (v, u, b) == (28.0, "cm", "28cm")
+
+    def test_food_dryer_trays(self):
+        v, u, b = extract_spec("식품건조기", "리큅 식품건조기 5단 트레이")
+        assert (u, b) == ("단", "5단")
+
+    def test_kettle_liter(self):
+        assert extract_spec("전기포트", "테팔 전기포트 1.7L")[2] == "0~5L"
+
+    def test_gas_range_burners(self):
+        assert extract_spec("가스레인지", "린나이 가스레인지 3구")[2] == "3구"
+
+    def test_ice_maker_kg(self):
+        assert extract_spec("제빙기", "카이저 제빙기 일 51kg")[1] == "kg"
+
+    def test_heatmat_size_text(self):
+        v, u, b = extract_spec("온수매트", "일월 온수매트 퀸 150x200")
+        assert u == "size" and b == "퀸"
+        assert extract_spec("온수매트", "슈퍼싱글 온수매트")[2] == "슈퍼싱글"
+        assert band_for(4.0, "size") == "퀸"
+
+    def test_electric_mat_person_first(self):
+        # 전기장판은 인용 우선
+        assert extract_spec("전기장판", "1인용 전기장판 싱글")[2] == "1인용"

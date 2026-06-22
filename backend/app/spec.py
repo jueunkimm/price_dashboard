@@ -21,12 +21,24 @@ _PATTERNS: dict[str, re.Pattern] = {
     "bar": re.compile(r"(\d{1,2})\s*(?:bar|바|기압)", re.IGNORECASE),
     "ch": re.compile(r"(\d(?:\.\d)?)\s*(?:ch|채널)", re.IGNORECASE),
     "W": re.compile(r"(\d{3,4})\s*w(?:att)?", re.IGNORECASE),
+    "병": re.compile(r"(\d+)\s*병"),  # 와인셀러 수납 병수
+    "cm": re.compile(r"(\d{2,3})\s*cm", re.IGNORECASE),  # 전기프라이팬 조리면 지름 등
+    "단": re.compile(r"(\d+)\s*단"),  # 식품건조기 트레이 단수
 }
+
+# 침대 규격(온수매트·전기장판) — 텍스트 규격을 순위 숫자로 저장하고 라벨로 환원.
+_SIZE_RANK = {"슈퍼싱글": 2, "라지킹": 6, "초킹": 6, "싱글": 1, "더블": 3, "퀸": 4, "킹": 5}
+_SIZE_WORD = {1: "싱글", 2: "슈퍼싱글", 3: "더블", 4: "퀸", 5: "킹", 6: "킹+"}
+_SIZE_RE = re.compile(r"(슈퍼싱글|라지킹|초킹|싱글|더블|퀸|킹)")
 
 
 def band_for(value: float | None, unit: str | None) -> str | None:
     """저장된 (값, 단위)로부터 밴드 라벨 재계산. 집계에서 사용."""
-    if value is None or unit is None or unit not in _PATTERNS:
+    if value is None or unit is None:
+        return None
+    if unit == "size":
+        return _SIZE_WORD.get(int(value))
+    if unit not in _PATTERNS:
         return None
     return _band(value, unit)
 
@@ -53,6 +65,21 @@ def _band(value: float, unit: str) -> str:
     if unit == "L":
         lo = int(value // 5) * 5
         return f"{lo}~{lo + 5}L"
+    if unit == "병":
+        v = int(value)
+        if v <= 18:
+            return "~18병"
+        if v <= 50:
+            return "19~50병"
+        if v <= 100:
+            return "51~100병"
+        return "100병+"
+    if unit == "cm":
+        return f"{int(value)}cm"
+    if unit == "단":
+        return f"{int(value)}단"
+    if unit == "size":
+        return _SIZE_WORD.get(int(value), str(value))
     return str(value)
 
 
@@ -65,15 +92,26 @@ CATEGORY_SPEC: dict[str, list[str]] = {
     "냉장고": ["L"],
     "김치냉장고": ["L"],
     "전자레인지·오븐": ["L"],
+    "광파오븐": ["L"],
     "에어프라이어": ["L"],
+    "튀김기": ["L"],
     "믹서·블렌더": ["L"],
+    "전기포트": ["L"],
+    "음식물처리기": ["L"],
     "정수기": [],  # 직수/저수조 — 표준 수치 규격 아님
     "커피머신": ["bar"],
     "인덕션·전기레인지": ["구"],
+    "가스레인지": ["구"],
+    "가스오븐레인지": ["구"],
+    "전기프라이팬": ["cm"],
+    "제빙기": ["kg"],  # 일일 제빙량
+    "식품건조기": ["단"],  # 트레이 단수
+    "와인셀러": ["병"],
     "세탁기": ["kg"],
     "건조기": ["kg"],
     "의류관리기": ["kg"],
     "무선청소기": ["W"],
+    "유선청소기": ["L"],  # 먼지통 용량
     "로봇청소기": [],
     "스팀다리미": ["W"],
     "비데": [],
@@ -83,6 +121,8 @@ CATEGORY_SPEC: dict[str, list[str]] = {
     "가습기": ["L"],
     "공기청정기": ["평"],
     "전기히터·온풍기": ["W"],
+    "온수매트": ["size"],  # 침대 규격(싱글/퀸/킹)
+    "전기장판": ["인용", "size"],
     "TV": ["형"],
     "사운드바": ["ch"],
     "프로젝터": [],
@@ -110,6 +150,12 @@ def extract_spec(
     if not units:
         return None, None, None
     for unit in units:
+        if unit == "size":  # 텍스트 규격(침대 사이즈) — 순위 숫자로 저장
+            sm = _SIZE_RE.search(title)
+            if sm:
+                rank = _SIZE_RANK[sm.group(1)]
+                return float(rank), "size", _SIZE_WORD.get(rank, sm.group(1))
+            continue
         m = _PATTERNS[unit].search(title)
         if m:
             val = float(m.group(1))
