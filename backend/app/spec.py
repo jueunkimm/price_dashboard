@@ -44,12 +44,35 @@ def band_for(value: float | None, unit: str | None) -> str | None:
 
 
 def _band(value: float, unit: str) -> str:
+    """동급 비교용 구간 라벨. 큰 규모 단위(kg·L·평·형)는 다나와식 '범위 구간'으로
+    묶어 파편화를 막고, L은 규모 인식(소형가전 vs 냉장고)으로 구간 폭을 달리한다."""
     if unit == "인용":
         return f"{int(value)}인용"
     if unit == "kg":
-        return f"{int(value)}kg"
+        # 다나와식 세탁/건조 용량 구간
+        if value < 4:
+            return "~3kg"
+        if value < 10:
+            return "4~9kg"
+        if value < 15:
+            return "10~14kg"
+        if value < 20:
+            return "15~19kg"
+        if value < 25:
+            return "20~24kg"
+        return "25kg~"
     if unit == "형":
-        return f"{int(value)}형"
+        if value < 33:
+            return "~32형"
+        if value < 44:
+            return "33~43형"
+        if value < 56:
+            return "44~55형"
+        if value < 66:
+            return "56~65형"
+        if value < 76:
+            return "66~75형"
+        return "76형~"
     if unit == "구":
         return f"{int(value)}구"
     if unit == "ch":
@@ -60,11 +83,35 @@ def _band(value: float, unit: str) -> str:
         lo = int(value // 500) * 500
         return f"{lo}~{lo + 500}W"
     if unit == "평":
-        lo = (int(value) // 10) * 10
+        if value < 7:
+            return "~6평"
+        if value < 11:
+            return "7~10평"
+        if value < 16:
+            return "11~15평"
+        if value < 19:
+            return "16~18평"
+        if value < 30:
+            return "19~29평"
+        lo = int(value // 10) * 10
         return f"{lo}~{lo + 10}평"
     if unit == "L":
-        lo = int(value // 5) * 5
-        return f"{lo}~{lo + 5}L"
+        # 규모 인식: 소형가전(포트·에어프라이어)은 좁게, 냉장고는 100L 구간(다나와식)
+        if value < 4:
+            return "~3L"
+        if value < 7:
+            return "4~6L"
+        if value < 11:
+            return "7~10L"
+        if value < 15:
+            return "11~14L"
+        if value < 20:
+            return "15~19L"
+        if value < 100:
+            lo = int(value // 10) * 10
+            return f"{lo}~{lo + 10}L"
+        lo = int(value // 100) * 100
+        return f"{lo}~{lo + 100}L"
     if unit == "병":
         v = int(value)
         if v <= 18:

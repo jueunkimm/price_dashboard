@@ -32,11 +32,11 @@ class TestCategoryAwareExtraction:
 
     def test_washer_kg(self):
         v, u, b = extract_spec("세탁기", "삼성 그랑데 세탁기 24kg")
-        assert (u, b) == ("kg", "24kg")
+        assert (u, b) == ("kg", "20~24kg")  # 다나와식 구간
 
     def test_tv_inch(self):
         v, u, b = extract_spec("TV", "LG 올레드 65형 4K")
-        assert (u, b) == ("형", "65형")
+        assert (u, b) == ("형", "56~65형")  # 다나와식 구간
 
     def test_induction_burners(self):
         v, u, b = extract_spec("인덕션·전기레인지", "쿠쿠 3구 인덕션")
@@ -56,8 +56,10 @@ class TestCategoryAwareExtraction:
         assert extract_spec("로봇청소기", "로보락 S10 물통형") == (None, None, None)
 
     def test_band_for_recompute(self):
-        assert band_for(65.0, "형") == "65형"
+        assert band_for(65.0, "형") == "56~65형"
         assert band_for(3.0, "구") == "3구"
+        assert band_for(870.0, "L") == "800~900L"
+        assert band_for(12.0, "kg") == "10~14kg"
         assert band_for(None, None) is None
 
 
@@ -76,7 +78,12 @@ class TestExpandedUnits:
         assert (u, b) == ("단", "5단")
 
     def test_kettle_liter(self):
-        assert extract_spec("전기포트", "테팔 전기포트 1.7L")[2] == "0~5L"
+        assert extract_spec("전기포트", "테팔 전기포트 1.7L")[2] == "~3L"
+
+    def test_fridge_liter_100band(self):
+        # 냉장고는 100L 구간(소형가전 L과 규모 구분)
+        assert extract_spec("냉장고", "삼성 비스포크 4도어 냉장고 870L")[2] == "800~900L"
+        assert extract_spec("전자레인지·오븐", "광파오븐 23L")[2] == "20~30L"
 
     def test_gas_range_burners(self):
         assert extract_spec("가스레인지", "린나이 가스레인지 3구")[2] == "3구"
