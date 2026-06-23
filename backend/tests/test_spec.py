@@ -100,3 +100,11 @@ class TestExpandedUnits:
     def test_electric_mat_person_first(self):
         # 전기장판은 인용 우선
         assert extract_spec("전기장판", "1인용 전기장판 싱글")[2] == "1인용"
+
+    def test_projector_lumen(self):
+        v, u, b = extract_spec("프로젝터", "엡손 빔프로젝터 3300안시루멘 풀HD")
+        assert u == "루멘" and b == "3000~6000lm"
+        assert extract_spec("프로젝터", "미니 LED 프로젝터 9000루멘")[2] == "6000lm~"
+
+    def test_clothescare_garments(self):
+        assert extract_spec("의류관리기", "LG 스타일러 5벌 블랙")[2] == "5벌"

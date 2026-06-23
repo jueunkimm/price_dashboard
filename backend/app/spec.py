@@ -24,6 +24,8 @@ _PATTERNS: dict[str, re.Pattern] = {
     "병": re.compile(r"(\d+)\s*병"),  # 와인셀러 수납 병수
     "cm": re.compile(r"(\d{2,3})\s*cm", re.IGNORECASE),  # 전기프라이팬 조리면 지름 등
     "단": re.compile(r"(\d+)\s*단"),  # 식품건조기 트레이 단수
+    "루멘": re.compile(r"(\d{3,5})\s*(?:안시|ansi|루멘|lm)", re.IGNORECASE),  # 프로젝터 밝기
+    "벌": re.compile(r"(\d+)\s*벌"),  # 의류관리기 수용량
 }
 
 # 침대 규격(온수매트·전기장판) — 텍스트 규격을 순위 숫자로 저장하고 라벨로 환원.
@@ -125,6 +127,17 @@ def _band(value: float, unit: str) -> str:
         return f"{int(value)}cm"
     if unit == "단":
         return f"{int(value)}단"
+    if unit == "벌":
+        return f"{int(value)}벌"
+    if unit == "루멘":  # 프로젝터 밝기(안시/LED루멘 혼재 → 폭넓은 구간)
+        v = int(value)
+        if v < 1000:
+            return "~1000lm"
+        if v < 3000:
+            return "1000~3000lm"
+        if v < 6000:
+            return "3000~6000lm"
+        return "6000lm~"
     if unit == "size":
         return _SIZE_WORD.get(int(value), str(value))
     return str(value)
@@ -156,7 +169,8 @@ CATEGORY_SPEC: dict[str, list[str]] = {
     "와인셀러": ["병"],
     "세탁기": ["kg"],
     "건조기": ["kg"],
-    "의류관리기": ["kg"],
+    "의류관리기": ["벌", "kg"],  # 다나와 수용량(벌)
+    "프로젝터": ["루멘"],  # 다나와 밝기 필터
     "무선청소기": ["W"],
     "유선청소기": ["L"],  # 먼지통 용량
     "로봇청소기": [],
@@ -172,7 +186,6 @@ CATEGORY_SPEC: dict[str, list[str]] = {
     "전기장판": ["인용", "size"],
     "TV": ["형"],
     "사운드바": ["ch"],
-    "프로젝터": [],
     "헤어드라이어·스타일러": ["W"],
     "면도기": [],
     "안마의자·안마기": [],
