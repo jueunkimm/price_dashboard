@@ -3,7 +3,7 @@
 실데이터 시뮬레이션에서 정타로 확인된 이동과, 반드시 '이동 안 함'이어야 하는
 까다로운 케이스(기능중첩·부속품·정배치·인접쌍)를 함께 고정한다.
 """
-from app.category_signals import danawa_type_category, route_target
+from app.category_signals import danawa_type_category, fryer_refine, route_target
 
 TRACKED = {
     "전기밥솥", "면도기", "냉장고", "김치냉장고", "음식물처리기", "식품건조기",
@@ -60,6 +60,25 @@ class TestNeverMisroutes:
 
     def test_no_signal_untouched(self):
         assert r("브라운 전기면도기 9시리즈 9PRO", "면도기") is None
+
+
+class TestFryerRefine:
+    def test_air_fryer_out_of_deepfryer(self):
+        # 에어프라이(겸용 포함)는 튀김기에서 에어프라이어로
+        assert fryer_refine("쿠쿠 에어프라이어 바스켓형 튀김기 CAF-C0510DB", "튀김기") == "에어프라이어"
+        assert fryer_refine("필립스 에어프라이 5L 글라스", "튀김기") == "에어프라이어"
+
+    def test_oil_fryer_out_of_airfryer(self):
+        assert fryer_refine("델키 윤식당 전기튀김기 업소용 DKR-113", "에어프라이어") == "튀김기"
+
+    def test_already_correct_stays(self):
+        assert fryer_refine("델키 전기튀김기 DK-205 7L", "튀김기") is None
+        assert fryer_refine("쿠쿠 에어프라이어 5L", "에어프라이어") is None
+
+    def test_unrelated_category_untouched(self):
+        # 광파오븐의 '에어프라이 기능' 등 다른 카테고리는 절대 건드리지 않음
+        assert fryer_refine("광파오븐 에어프라이 기능 23L", "전자레인지·오븐") is None
+        assert fryer_refine("LG 디오스 광파오븐 에어프라이", "광파오븐") is None
 
 
 class TestDanawaTypeAuthority:

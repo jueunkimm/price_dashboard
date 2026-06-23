@@ -26,7 +26,7 @@ from collections import Counter, defaultdict
 
 from sqlalchemy import select
 
-from app.category_signals import danawa_type_category, route_target
+from app.category_signals import danawa_type_category, fryer_refine, route_target
 from app.database import SessionLocal
 from app.models import Category, DanawaSpec, Product
 from collector.brand_matcher import BrandMatcher
@@ -120,6 +120,16 @@ def recategorize() -> dict:
                             if len(examples) < 12:
                                 examples.append(f"[다나와][{src_name}→{dcat}] {(p.model_name or '')[:40]}")
                     continue  # 다나와 분류 확정 제품은 하위 라우터가 안 건드림
+            # (0.7) 튀김기↔에어프라이어 전용 정제(겸용 → 에어프라이어)
+            fr = fryer_refine(p.model_name or "", src_name)
+            if fr and fr != src_name and fr in name_to_id:
+                p.category_id = name_to_id[fr]
+                moves += 1
+                type_moves += 1
+                by_move[(src_name, fr)] += 1
+                if len(examples) < 12:
+                    examples.append(f"[튀김][{src_name}→{fr}] {(p.model_name or '')[:40]}")
+                continue
             # (1) 제목 배타적 제품유형 라우팅 — 모델코드·naver_cat 없이도 명백한 오배치 교정
             #     (예: '쿠쿠 면도기' 보조검색에 섞인 쿠쿠 압력밥솥 → 전기밥솥)
             tname = route_target(p.model_name or "", src_name, tracked)

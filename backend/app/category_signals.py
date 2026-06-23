@@ -116,6 +116,24 @@ def _norm(t: str) -> str:
     return (t or "").replace(" ", "")
 
 
+def fryer_refine(title: str, current: str) -> str | None:
+    """튀김기 ↔ 에어프라이어 전용 정제(이 두 카테고리 안에서만 동작 → 광파오븐 등 무관).
+
+    - '에어프라이' 표기 = 에어프라이어(기름 없는 열풍). 겸용('에어프라이어 튀김기')도 에어프라이어.
+    - 기름튀김('전기튀김'·'기름튀김')인데 '에어프라이' 없으면 튀김기.
+    """
+    if current not in ("튀김기", "에어프라이어"):
+        return None
+    n = _norm(title)
+    air = "에어프라이" in n
+    oil = ("전기튀김" in n) or ("기름튀김" in n)
+    if current == "튀김기" and air:
+        return "에어프라이어"
+    if current == "에어프라이어" and oil and not air:
+        return "튀김기"
+    return None
+
+
 def signal_categories(title: str) -> set[str]:
     """제목에서 감지된 배타적 제품유형 카테고리 집합(중첩 substring 해소)."""
     n = _norm(title)
