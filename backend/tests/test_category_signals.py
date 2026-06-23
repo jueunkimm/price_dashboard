@@ -100,6 +100,13 @@ class TestDanawaTypeAuthority:
         assert danawa_type_category("수평기", self.T) is None
         assert danawa_type_category("오븐레인지", self.T) is None
 
+    def test_dish_and_food_dryers_not_in_clothes_dryer(self):
+        # '식기건조기'·'고추건조기'가 '건조기'(의류) substring으로 잘못 들어가지 않게
+        assert r("쿠쿠 식기건조기 가정용 6인용 CDD-A9010S", "건조기") == "식기세척기"
+        assert r("태양 고추건조기 가정용 10단 농산물 말리는기계", "건조기") == "식품건조기"
+        # 진짜 의류건조기는 건조기 유지
+        assert r("삼성 그랑데 AI 건조기 21kg", "건조기") is None
+
     def test_dryer_out_of_washer_but_combo_stays(self):
         # 세탁기에 섞인 순수 의류건조기는 건조기로 이동
         assert r("쿠쿠 미니 의류건조기 26년형 3KG 화이트", "세탁기") == "건조기"

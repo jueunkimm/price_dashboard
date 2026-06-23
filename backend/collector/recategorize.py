@@ -29,6 +29,7 @@ from sqlalchemy import select
 from app.category_signals import danawa_type_category, fryer_refine, route_target
 from app.database import SessionLocal
 from app.models import Category, DanawaSpec, Product
+from app.spec import extract_spec
 from collector.brand_matcher import BrandMatcher
 
 MIN_SAMPLE = 5  # 카테고리 대표 네이버분류 판정 최소 표본(aggregation과 동일)
@@ -70,14 +71,16 @@ def recategorize() -> dict:
 
         dominant, owner = _build_authority(prods, cat_ids)
         matcher = BrandMatcher(db)
-        # 다나와 권위 분류(코드매칭된 제품의 정확한 제품유형)
-        danawa_types = {
-            ds.model_key: ds.danawa_type
-            for ds in db.scalars(
-                select(DanawaSpec).where(DanawaSpec.status == "matched")
-            ).all()
-            if ds.danawa_type
-        }
+        # 다나와 권위(코드매칭): 제품유형(분류) + raw_spec(용량 재계산용)
+        danawa_types: dict = {}
+        danawa_specs: dict = {}
+        for ds in db.scalars(
+            select(DanawaSpec).where(DanawaSpec.status == "matched")
+        ).all():
+            if ds.danawa_type:
+                danawa_types[ds.model_key] = ds.danawa_type
+            if ds.raw_spec:
+                danawa_specs[ds.model_key] = ds.raw_spec
 
         tracked = set(cat_names.values())
         moves = 0
@@ -86,6 +89,7 @@ def recategorize() -> dict:
         danawa_moves = 0
         by_move: Counter = Counter()
         examples: list[str] = []
+        moved: list = []  # 이동된 제품 — 새 카테고리 기준으로 용량 재계산
         for p in prods:
             src_name = cat_names.get(p.category_id, "?")
             # (0) 카탈로그 코드 권위 — 쿠쿠 모델코드(CIR-/CRP- 등)가 가리키는 공식 카테고리.
@@ -159,12 +163,29 @@ def recategorize() -> dict:
             by_move[(src_name, tgt_name)] += 1
             if len(examples) < 12:
                 examples.append(f"[분류][{src_name}→{tgt_name}] {(p.model_name or '')[:42]}")
+
+        # 용량 재계산 — 이동으로 카테고리가 바뀐 제품은 용량 단위가 이전 카테고리 기준이라
+        # stale(예: 건조기로 옮겨진 식기건조기의 '6인용'). 최종 카테고리 기준으로 다시 계산.
+        recap = 0
+        for p in prods:
+            cur = cat_names.get(p.category_id)
+            cap_v = cap_u = band = None
+            spec = danawa_specs.get(p.model_key) if p.model_key else None
+            if spec:
+                cap_v, cap_u, band = extract_spec(cur, spec)
+            if band is None:
+                cap_v, cap_u, band = extract_spec(cur, p.model_name or "")
+            new_json = {"capacity_band": band} if band else None
+            if p.capacity_unit != cap_u or (p.spec_json or None) != new_json:
+                recap += 1
+            p.capacity_value, p.capacity_unit, p.spec_json = cap_v, cap_u, new_json
         db.commit()
 
         nav_moves = moves - type_moves - code_moves - danawa_moves
         print(
             f"[recategorize] 본품 {len(prods)} | 소유권 매핑 {len(owner)} | 자동이동 {moves}"
             f"(코드 {code_moves} + 다나와 {danawa_moves} + 제목유형 {type_moves} + 네이버분류 {nav_moves})"
+            f" | 용량재계산 {recap}"
         )
         for (src, tgt), n in by_move.most_common(20):
             print(f"  이동 {src} → {tgt}: {n}")

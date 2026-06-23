@@ -38,7 +38,10 @@ DECISIVE: dict[str, str] = {
     # '건조기' substring 오라우팅 방지. (더 구체적 키워드가 우선 — nested substring 해소)
     "세탁기": "세탁기", "세탁건조기": "세탁기", "세탁기건조기": "세탁기",
     "의류건조기": "건조기", "건조기": "건조기",
-    "식품건조기": "식품건조기",
+    # '식기건조기'·'고추건조기'가 '건조기'(의류) substring으로 잘못 끌려가는 것 차단(더 긴 키워드 우선).
+    # 식기건조기는 식기세척기(주방 식기류)로, 고추/농산물건조기는 식품건조기로 귀속.
+    "식품건조기": "식품건조기", "식기건조기": "식기세척기",
+    "고추건조기": "식품건조기", "농산물건조기": "식품건조기",
 }
 
 # 기능 중첩/인접으로 자동 라우팅을 금지하는 카테고리 쌍(방향 무관)
@@ -151,9 +154,19 @@ def route_target(title: str, current: str, tracked: set[str]) -> str | None:
     sig = {c for c in signal_categories(title) if c in tracked}
     if not sig or current in sig:
         return None
-    # 현 카테고리 자체 신호(키워드/이름)가 제목에 있으면 정배치/겸용 → 건드리지 않음
+    # 현 카테고리 자체 신호(키워드/이름)가 제목에 있으면 정배치/겸용 → 건드리지 않음.
+    # 단, nested 인식: current 키워드가 '더 긴 매칭 키워드'의 일부면 무시(예: '식기건조기'
+    # 안의 '건조기'는 건조기 신호가 아님 → 식기건조기가 건조기에 갇히는 것 방지).
+    matched_all = [k for k in _KWS if k in n]
     own = _OWN_KW.get(current, set()) | {current}
-    if any(k and _norm(k) in n for k in own):
+
+    def _own_present(k: str) -> bool:
+        nk = _norm(k)
+        if not nk or nk not in n:
+            return False
+        return not any(o != k and nk in _norm(o) for o in matched_all)
+
+    if any(_own_present(k) for k in own):
         return None
     if any(h in title for h in ACC_HINT):
         return None
