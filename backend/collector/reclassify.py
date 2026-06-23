@@ -8,7 +8,7 @@ from __future__ import annotations
 from sqlalchemy import select
 
 from app.database import SessionLocal
-from app.models import Category, Product
+from app.models import Category, DanawaSpec, Product
 from app.spec import extract_spec
 from app.textutil import (
     extract_model_key,
@@ -35,6 +35,14 @@ def reclassify() -> dict:
         cat_names = {c.id: c.name for c in db.scalars(select(Category)).all()}
         name_to_id = {n: i for i, n in cat_names.items()}
         products = list(db.scalars(select(Product)).all())
+        # 다나와 사양 캐시(모델코드 → 깨끗한 spec_list) — 용량 추출 권위 소스
+        danawa = {
+            ds.model_key: ds.raw_spec
+            for ds in db.scalars(
+                select(DanawaSpec).where(DanawaSpec.status == "matched")
+            ).all()
+            if ds.raw_spec
+        }
 
         before_own = sum(1 for p in products if p.is_own_brand)
         changed_to_own = 0
@@ -91,9 +99,14 @@ def reclassify() -> dict:
                     if tid:
                         category_moves += 1
                         p.category_id = tid
-            cap_val, cap_unit, band = extract_spec(
-                cat_names.get(p.category_id), p.model_name or ""
-            )
+            # 용량: 다나와 구조화 사양 우선(정확), 없으면 제목에서 추출
+            cur_cat_name = cat_names.get(p.category_id)
+            cap_val = cap_unit = band = None
+            ds_spec = danawa.get(p.model_key) if p.model_key else None
+            if ds_spec:
+                cap_val, cap_unit, band = extract_spec(cur_cat_name, ds_spec)
+            if band is None:  # 다나와 미매칭/미추출 → 제목 폴백
+                cap_val, cap_unit, band = extract_spec(cur_cat_name, p.model_name or "")
             p.capacity_value = cap_val
             p.capacity_unit = cap_unit
             p.spec_json = {"capacity_band": band} if band else None

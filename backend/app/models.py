@@ -137,6 +137,23 @@ class CuckooModel(Base):
     is_accessory: Mapped[bool] = mapped_column(Boolean, default=False)  # 별매품 여부
 
 
+class DanawaSpec(Base):
+    """다나와 구조화 사양 캐시 — 모델코드로 다나와를 조회해 정확한 제품유형/용량을 확보.
+    네이버 제목엔 없는 사양(로봇청소기 흡입력 등)을 채우는 권위 소스. 모델코드 단위 캐시."""
+    __tablename__ = "danawa_spec"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    model_key: Mapped[str] = mapped_column(String(120), unique=True, index=True)  # 정규화 모델코드
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # matched/notfound/error
+    danawa_type: Mapped[str | None] = mapped_column(String(60), nullable=True)  # spec 첫 토큰(제품유형)
+    matched_name: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    raw_spec: Mapped[str | None] = mapped_column(String(1000), nullable=True)  # spec_list 원문
+    capacity_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    capacity_unit: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    capacity_band: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class MacroMetric(Base):
     """거시지표(F12) — 환율/금리/물가 등."""
     __tablename__ = "macro_metric"

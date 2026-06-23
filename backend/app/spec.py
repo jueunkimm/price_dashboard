@@ -26,6 +26,7 @@ _PATTERNS: dict[str, re.Pattern] = {
     "단": re.compile(r"(\d+)\s*단"),  # 식품건조기 트레이 단수
     "루멘": re.compile(r"(\d{3,5})\s*(?:안시|ansi|루멘|lm)", re.IGNORECASE),  # 프로젝터 밝기
     "벌": re.compile(r"(\d+)\s*벌"),  # 의류관리기 수용량
+    "Pa": re.compile(r"(\d[\d,]{2,})\s*pa", re.IGNORECASE),  # 청소기 흡입력(다나와 사양)
 }
 
 # 침대 규격(온수매트·전기장판) — 텍스트 규격을 순위 숫자로 저장하고 라벨로 환원.
@@ -129,6 +130,17 @@ def _band(value: float, unit: str) -> str:
         return f"{int(value)}단"
     if unit == "벌":
         return f"{int(value)}벌"
+    if unit == "Pa":  # 청소기 흡입력(다나와)
+        v = int(value)
+        if v < 2000:
+            return "~2000Pa"
+        if v < 5000:
+            return "2000~5000Pa"
+        if v < 8000:
+            return "5000~8000Pa"
+        if v < 12000:
+            return "8000~12000Pa"
+        return "12000Pa~"
     if unit == "루멘":  # 프로젝터 밝기(안시/LED루멘 혼재 → 폭넓은 구간)
         v = int(value)
         if v < 1000:
@@ -171,9 +183,10 @@ CATEGORY_SPEC: dict[str, list[str]] = {
     "건조기": ["kg"],
     "의류관리기": ["벌", "kg"],  # 다나와 수용량(벌)
     "프로젝터": ["루멘"],  # 다나와 밝기 필터
-    "무선청소기": ["W"],
-    "유선청소기": ["L"],  # 먼지통 용량
-    "로봇청소기": [],
+    "무선청소기": ["Pa", "W"],  # 다나와 흡입력(Pa 우선, 없으면 W)
+    "유선청소기": ["W", "L"],  # 흡입력(W) 우선, 먼지통(L)
+    "로봇청소기": ["Pa"],  # 다나와 흡입력(제목엔 없고 다나와 사양에 있음)
+    "토스터": ["구"],  # 투입구 수
     "스팀다리미": ["W"],
     "비데": [],
     "에어컨": ["평"],
@@ -218,7 +231,7 @@ def extract_spec(
             continue
         m = _PATTERNS[unit].search(title)
         if m:
-            val = float(m.group(1))
+            val = float(m.group(1).replace(",", ""))  # '10,000Pa' 등 콤마 제거
             return val, unit, _band(val, unit)
 
     # 전기밥솥 보강: 제목에 인용 없으면 모델코드에서 인용 추출(검증상 오류 0%).

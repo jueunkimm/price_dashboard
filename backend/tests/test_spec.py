@@ -108,3 +108,8 @@ class TestExpandedUnits:
 
     def test_clothescare_garments(self):
         assert extract_spec("의류관리기", "LG 스타일러 5벌 블랙")[2] == "5벌"
+
+    def test_vacuum_pa_from_danawa_spec(self):
+        # 다나와 spec_list의 흡입력(Pa, 콤마 포함) — 네이버 제목엔 없는 사양
+        assert extract_spec("로봇청소기", "로봇청소기 / 흡입력 : 5,000Pa / 사용시간")[2] == "5000~8000Pa"
+        assert extract_spec("무선청소기", "핸디스틱청소기 / 무선 / 흡입력 : 21,000Pa")[2] == "12000Pa~"
