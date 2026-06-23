@@ -20,7 +20,7 @@ _PATTERNS: dict[str, re.Pattern] = {
     "구": re.compile(r"(\d)\s*구"),
     "bar": re.compile(r"(\d{1,2})\s*(?:bar|바|기압)", re.IGNORECASE),
     "ch": re.compile(r"(\d(?:\.\d)?)\s*(?:ch|채널)", re.IGNORECASE),
-    "W": re.compile(r"(\d{3,4})\s*w(?:att)?", re.IGNORECASE),
+    "W": re.compile(r"(\d{1,2},\d{3}|\d{3,4})\s*w(?:att)?", re.IGNORECASE),
     "병": re.compile(r"(\d+)\s*병"),  # 와인셀러 수납 병수
     "cm": re.compile(r"(\d{2,3})\s*cm", re.IGNORECASE),  # 전기프라이팬 조리면 지름 등
     "단": re.compile(r"(\d+)\s*단"),  # 식품건조기 트레이 단수
@@ -183,8 +183,8 @@ CATEGORY_SPEC: dict[str, list[str]] = {
     "건조기": ["kg"],
     "의류관리기": ["벌", "kg"],  # 다나와 수용량(벌)
     "프로젝터": ["루멘"],  # 다나와 밝기 필터
-    "무선청소기": ["Pa", "W"],  # 다나와 흡입력(Pa 우선, 없으면 W)
-    "유선청소기": ["W", "L"],  # 흡입력(W) 우선, 먼지통(L)
+    "무선청소기": ["Pa"],  # 다나와 흡입력(Pa). 소비전력 W는 흡입력과 혼동되어 제외
+    "유선청소기": ["W"],  # 흡입력/소비전력(W). L은 흡입력·풍량 오인식 노이즈라 제외
     "로봇청소기": ["Pa"],  # 다나와 흡입력(제목엔 없고 다나와 사양에 있음)
     "토스터": ["구"],  # 투입구 수
     "스팀다리미": ["W"],
