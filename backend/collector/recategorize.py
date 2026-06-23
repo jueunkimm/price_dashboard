@@ -26,9 +26,9 @@ from collections import Counter, defaultdict
 
 from sqlalchemy import select
 
-from app.category_signals import route_target
+from app.category_signals import danawa_type_category, route_target
 from app.database import SessionLocal
-from app.models import Category, Product
+from app.models import Category, DanawaSpec, Product
 from collector.brand_matcher import BrandMatcher
 
 MIN_SAMPLE = 5  # 카테고리 대표 네이버분류 판정 최소 표본(aggregation과 동일)
@@ -70,11 +70,20 @@ def recategorize() -> dict:
 
         dominant, owner = _build_authority(prods, cat_ids)
         matcher = BrandMatcher(db)
+        # 다나와 권위 분류(코드매칭된 제품의 정확한 제품유형)
+        danawa_types = {
+            ds.model_key: ds.danawa_type
+            for ds in db.scalars(
+                select(DanawaSpec).where(DanawaSpec.status == "matched")
+            ).all()
+            if ds.danawa_type
+        }
 
         tracked = set(cat_names.values())
         moves = 0
         type_moves = 0
         code_moves = 0
+        danawa_moves = 0
         by_move: Counter = Counter()
         examples: list[str] = []
         for p in prods:
@@ -95,6 +104,22 @@ def recategorize() -> dict:
                     if len(examples) < 12:
                         examples.append(f"[코드][{src_name}→{tgt_name}] {(p.model_name or '')[:42]}")
                 continue  # 코드 권위 제품은 다른 라우터가 건드리지 않음(고정)
+            # (0.5) 다나와 권위 분류 — 코드매칭 제품의 정확한 제품유형으로 교정·고정
+            #       (예: 유선청소기에 섞인 핸디스틱청소기 → 무선청소기, 혈당계의 휴대용 버너 → 가스레인지)
+            dt = danawa_types.get(p.model_key) if p.model_key else None
+            if dt:
+                dcat = danawa_type_category(dt, tracked)
+                if dcat:
+                    if dcat != src_name:
+                        tid = name_to_id.get(dcat)
+                        if tid:
+                            p.category_id = tid
+                            moves += 1
+                            danawa_moves += 1
+                            by_move[(src_name, dcat)] += 1
+                            if len(examples) < 12:
+                                examples.append(f"[다나와][{src_name}→{dcat}] {(p.model_name or '')[:40]}")
+                    continue  # 다나와 분류 확정 제품은 하위 라우터가 안 건드림
             # (1) 제목 배타적 제품유형 라우팅 — 모델코드·naver_cat 없이도 명백한 오배치 교정
             #     (예: '쿠쿠 면도기' 보조검색에 섞인 쿠쿠 압력밥솥 → 전기밥솥)
             tname = route_target(p.model_name or "", src_name, tracked)
@@ -126,9 +151,10 @@ def recategorize() -> dict:
                 examples.append(f"[분류][{src_name}→{tgt_name}] {(p.model_name or '')[:42]}")
         db.commit()
 
+        nav_moves = moves - type_moves - code_moves - danawa_moves
         print(
             f"[recategorize] 본품 {len(prods)} | 소유권 매핑 {len(owner)} | 자동이동 {moves}"
-            f"(코드 {code_moves} + 제목유형 {type_moves} + 네이버분류 {moves - type_moves - code_moves})"
+            f"(코드 {code_moves} + 다나와 {danawa_moves} + 제목유형 {type_moves} + 네이버분류 {nav_moves})"
         )
         for (src, tgt), n in by_move.most_common(20):
             print(f"  이동 {src} → {tgt}: {n}")
@@ -139,6 +165,7 @@ def recategorize() -> dict:
             "owner_maps": len(owner),
             "moves": moves,
             "code_moves": code_moves,
+            "danawa_moves": danawa_moves,
             "type_moves": type_moves,
             "by_move": {f"{s}→{t}": n for (s, t), n in by_move.items()},
             "examples": examples,

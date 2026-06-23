@@ -3,7 +3,7 @@
 실데이터 시뮬레이션에서 정타로 확인된 이동과, 반드시 '이동 안 함'이어야 하는
 까다로운 케이스(기능중첩·부속품·정배치·인접쌍)를 함께 고정한다.
 """
-from app.category_signals import route_target
+from app.category_signals import danawa_type_category, route_target
 
 TRACKED = {
     "전기밥솥", "면도기", "냉장고", "김치냉장고", "음식물처리기", "식품건조기",
@@ -60,6 +60,26 @@ class TestNeverMisroutes:
 
     def test_no_signal_untouched(self):
         assert r("브라운 전기면도기 9시리즈 9PRO", "면도기") is None
+
+
+class TestDanawaTypeAuthority:
+    T = {"무선청소기", "유선청소기", "전기밥솥", "사운드바", "홈시어터", "가스레인지",
+         "혈당계", "세탁기", "건조기", "에어컨", "믹서·블렌더", "로봇청소기"}
+
+    def test_resolves_real_types(self):
+        # 다나와 권위 분류 → 정확 카테고리(하베스트 검증된 교정 사례)
+        assert danawa_type_category("핸디스틱청소기", self.T) == "무선청소기"
+        assert danawa_type_category("IH압력밥솥", self.T) == "전기밥솥"
+        assert danawa_type_category("TV사운드바", self.T) == "사운드바"
+        assert danawa_type_category("휴대용 가스레인지(버너)", self.T) == "가스레인지"
+        assert danawa_type_category("미니건조기", self.T) == "건조기"
+        assert danawa_type_category("진공블렌더", self.T) == "믹서·블렌더"
+
+    def test_ambiguous_formfactors_skipped(self):
+        # 카테고리어 없는 형태/세부속성 토큰은 매핑 안 함(안전)
+        assert danawa_type_category("스탠드형", self.T) is None
+        assert danawa_type_category("수평기", self.T) is None
+        assert danawa_type_category("오븐레인지", self.T) is None
 
     def test_dryer_out_of_washer_but_combo_stays(self):
         # 세탁기에 섞인 순수 의류건조기는 건조기로 이동
