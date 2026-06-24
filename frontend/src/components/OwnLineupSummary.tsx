@@ -39,7 +39,8 @@ export default function OwnLineupSummary({
           </span>
         </h2>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+      {/* 변동 큰 순 정렬 — 중요한 것이 위. 49개가 길어 고정 높이 스크롤로 묶음 */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 max-h-[19rem] overflow-auto pr-1 -mr-1">
         {own.map((c) => (
           <button
             key={c.category_id}

@@ -116,25 +116,28 @@ export default function CategoryNav({
         <div className="text-slate-400 text-sm py-6 text-center">검색 결과가 없습니다.</div>
       )}
 
-      {groups.map(([g, list]) => (
-        <div key={g}>
-          <div className="flex items-center gap-2 mb-2">
-            <h3 className="text-xs font-semibold text-slate-500">{g}</h3>
-            <span className="text-[10px] text-slate-300">{list.length}</span>
-            <div className="flex-1 h-px bg-slate-100" />
+      {/* 66개 카드가 페이지를 길게 늘려, 고정 높이 스크롤로 묶음(검색·★토글은 위에 고정) */}
+      <div className="max-h-[34rem] overflow-auto space-y-4 pr-1 -mr-1">
+        {groups.map(([g, list]) => (
+          <div key={g}>
+            <div className="flex items-center gap-2 mb-2 sticky top-0 bg-slate-50/95 backdrop-blur py-1 z-10">
+              <h3 className="text-xs font-semibold text-slate-500">{g}</h3>
+              <span className="text-[10px] text-slate-300">{list.length}</span>
+              <div className="flex-1 h-px bg-slate-100" />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
+              {list.map((c) => (
+                <CategoryCard
+                  key={c.category_id}
+                  c={c}
+                  selected={selectedId === c.category_id}
+                  onClick={() => onSelect(selectedId === c.category_id ? null : c)}
+                />
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
-            {list.map((c) => (
-              <CategoryCard
-                key={c.category_id}
-                c={c}
-                selected={selectedId === c.category_id}
-                onClick={() => onSelect(selectedId === c.category_id ? null : c)}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
