@@ -28,12 +28,14 @@ export default function MovementTable({
     );
 
   return (
-    <div className="overflow-x-auto rounded-xl bg-white shadow-sm border border-slate-100">
-      <div className="flex justify-end px-3 py-1.5 border-b border-slate-50">
+    <div className="rounded-xl bg-white shadow-sm border border-slate-100">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-slate-50">
+        <span className="text-xs text-slate-400">{rows.length}건 · 스크롤로 더 보기</span>
         <button onClick={exportCsv} className={csvBtnClass}>⬇ CSV</button>
       </div>
+      <div className="max-h-[28rem] overflow-auto rounded-b-xl">
       <table className="w-full text-sm">
-        <thead className="bg-slate-50 text-slate-500 text-xs">
+        <thead className="bg-slate-50 text-slate-500 text-xs sticky top-0 z-10">
           <tr>
             <th className="text-left px-3 py-2">제품</th>
             <th className="text-left px-3 py-2">카테고리</th>
@@ -70,6 +72,7 @@ export default function MovementTable({
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
