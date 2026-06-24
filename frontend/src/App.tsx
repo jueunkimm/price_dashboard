@@ -7,10 +7,10 @@ import {
   type RankingRow,
 } from "./api";
 import KpiBar from "./components/KpiBar";
+import CompareWorkbench from "./components/CompareWorkbench";
 import CategoryNav from "./components/CategoryNav";
 import OwnLineupSummary from "./components/OwnLineupSummary";
 import SignalStrip from "./components/SignalStrip";
-import MovementTable from "./components/MovementTable";
 import TrendChart from "./components/TrendChart";
 import PositioningPanel from "./components/PositioningPanel";
 import CollectionStatus from "./components/CollectionStatus";
@@ -46,7 +46,6 @@ export default function App() {
   const [filters, setFilters] = useState<ProductFilters>({ exclude_rental: true });
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [ovView, setOvView] = useState<"ranking" | "trend">("ranking"); // 개요 하단 토글
 
   useEffect(() => {
     setErr(null);
@@ -262,30 +261,14 @@ export default function App() {
                   </section>
 
                   <section>
-                    <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                      <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden text-sm">
-                        {([
-                          { k: "ranking", label: "변동 랭킹" },
-                          { k: "trend", label: "가격 추세" },
-                        ] as const).map((v) => (
-                          <button
-                            key={v.k}
-                            onClick={() => setOvView(v.k)}
-                            className={`px-3 py-1.5 font-medium transition ${
-                              ovView === v.k ? "bg-own text-white" : "text-slate-500 hover:bg-slate-50"
-                            }`}
-                          >
-                            {v.label}
-                          </button>
-                        ))}
-                      </div>
-                      {Legend}
-                    </div>
-                    {ovView === "ranking" ? (
-                      <MovementTable rows={ranking} onSelect={setSelectedProduct} />
-                    ) : (
-                      <TrendChart productId={selectedProduct} />
-                    )}
+                    <h2 className="text-sm font-semibold text-slate-500 mb-2 flex items-center gap-2 flex-wrap">
+                      비교 워크벤치
+                      <span className="text-xs font-normal text-slate-400">
+                        랭킹에서 제품을 클릭해 가격 추이 비교(최대 5)
+                      </span>
+                      <span className="ml-auto">{Legend}</span>
+                    </h2>
+                    <CompareWorkbench rows={ranking} onOpenDetail={setSelectedProduct} />
                   </section>
                 </>
               )}

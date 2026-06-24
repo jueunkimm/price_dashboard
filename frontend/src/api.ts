@@ -325,6 +325,8 @@ export const api = {
     loadJSON<Record<string, Timeseries>>("timeseries").then(
       (m) => m[String(productId)] ?? { product_id: productId, model_name: "", is_own_brand: false, series: [] }
     ),
+  // 전체 시계열 맵(비교 워크벤치: 스파크라인 + 다중 제품 정규화 비교)
+  timeseriesAll: () => loadJSON<Record<string, Timeseries>>("timeseries"),
   positioning: () => loadJSON<Positioning[]>("positioning"),
   // 동급(용량) 포지셔닝 — products.json에서 브라우저 계산(어떤 제품끼리 비교했는지 포함)
   positioningSegmented: () =>
