@@ -77,6 +77,8 @@ def run_cuckoo_collection() -> dict:
                     is_rental=False,
                     is_accessory=False,
                     model_key=cm.base_code,
+                    image_url=(match.get("image") or "")[:500] or None,
+                    link=(match.get("link") or "")[:500] or None,  # 상품 페이지 링크(↗)
                     capacity_value=cap_v,
                     capacity_unit=cap_u,
                     spec_json={"capacity_band": band} if band else None,
@@ -86,6 +88,13 @@ def run_cuckoo_collection() -> dict:
                 created += 1
             else:
                 prod.category_id = cm.mapped_category_id  # 권위 카테고리
+                # 링크/이미지 백필 — 방법 B로 먼저 생성돼 link가 비어 있던 기존 제품 보강
+                lnk = (match.get("link") or "")[:500] or None
+                if lnk and not prod.link:
+                    prod.link = lnk
+                img = (match.get("image") or "")[:500] or None
+                if img and not prod.image_url:
+                    prod.image_url = img
 
             db.add(
                 PriceSnapshot(

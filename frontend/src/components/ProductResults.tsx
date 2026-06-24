@@ -157,32 +157,33 @@ export default function ProductResults({
                         {r.off_category && (
                           <span className="shrink-0 text-[10px] bg-orange-100 text-orange-600 px-1 py-0.5 rounded" title="네이버 분류가 이 카테고리와 달라 가격 통계에서 제외됨">타분류?</span>
                         )}
-                        {r.link ? (
-                          <a
-                            href={r.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            title="네이버 상품 페이지 열기"
-                            className="truncate hover:text-own hover:underline decoration-own/40"
-                          >
-                            {r.model_name}
-                          </a>
-                        ) : (
-                          <span className="truncate">{r.model_name}</span>
-                        )}
-                        {r.link && (
-                          <a
-                            href={r.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            title="네이버 상품 페이지 열기"
-                            className="shrink-0 text-slate-300 hover:text-own"
-                          >
-                            ↗
-                          </a>
-                        )}
+                        {/* 링크 있으면 상품 페이지(↗), 없으면 네이버 쇼핑 검색으로 폴백(모두 클릭 가능) */}
+                        <a
+                          href={
+                            r.link ||
+                            `https://search.shopping.naver.com/search/all?query=${encodeURIComponent(r.model_name)}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          title={r.link ? "네이버 상품 페이지 열기" : "네이버 쇼핑에서 검색"}
+                          className="truncate hover:text-own hover:underline decoration-own/40"
+                        >
+                          {r.model_name}
+                        </a>
+                        <a
+                          href={
+                            r.link ||
+                            `https://search.shopping.naver.com/search/all?query=${encodeURIComponent(r.model_name)}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          title={r.link ? "네이버 상품 페이지 열기" : "네이버 쇼핑에서 검색"}
+                          className="shrink-0 text-slate-300 hover:text-own"
+                        >
+                          {r.link ? "↗" : "⌕"}
+                        </a>
                       </div>
                       <div className="text-[11px] text-slate-400 truncate mt-0.5">
                         <span className="text-slate-500">{r.brand}</span>
