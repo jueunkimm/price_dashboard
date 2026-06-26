@@ -46,6 +46,25 @@ export default function CompareWorkbench({
 }) {
   const [tsMap, setTsMap] = useState<Record<string, Timeseries>>({});
   const [selected, setSelected] = useState<number[]>([]);
+  const [sort, setSort] = useState<{ key: "name" | "price" | "chg"; dir: "asc" | "desc" } | null>(null);
+
+  const clickSort = (key: "name" | "price" | "chg") =>
+    setSort((s) =>
+      s?.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: key === "name" ? "asc" : "desc" }
+    );
+  const sortArrow = (key: string) =>
+    sort?.key === key ? <span className="text-own ml-0.5">{sort.dir === "asc" ? "▲" : "▼"}</span> : null;
+  const sortedRows = useMemo(() => {
+    if (!sort) return rows;
+    const dir = sort.dir === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      let c = 0;
+      if (sort.key === "name") c = a.model_name.localeCompare(b.model_name, "ko");
+      else if (sort.key === "price") c = a.current_price - b.current_price;
+      else c = (a.change_pct ?? -Infinity) - (b.change_pct ?? -Infinity);
+      return c * dir;
+    });
+  }, [rows, sort]);
 
   useEffect(() => {
     api.timeseriesAll().then(setTsMap).catch(() => setTsMap({}));
@@ -119,15 +138,21 @@ export default function CompareWorkbench({
           <span className="text-sm font-semibold text-slate-700">가격 변동 랭킹</span>
           <span className="text-[11px] text-slate-400">{rows.length}개 · 행 클릭 → 비교 추가</span>
         </div>
-        <div className="grid grid-cols-[28px_1fr_104px_84px_64px] gap-2 px-3 py-1.5 bg-slate-50/70 border-b border-slate-100 text-[11px] font-semibold text-slate-400">
+        <div className="grid grid-cols-[28px_1fr_104px_84px_64px] gap-2 px-3 py-1.5 bg-slate-50/70 border-b border-slate-100 text-[11px] font-semibold text-slate-400 select-none">
           <div />
-          <div>제품</div>
-          <div className="text-right">현재가</div>
-          <div className="text-right">변동</div>
+          <div className="cursor-pointer hover:text-slate-600" onClick={() => clickSort("name")}>
+            제품{sortArrow("name")}
+          </div>
+          <div className="text-right cursor-pointer hover:text-slate-600" onClick={() => clickSort("price")}>
+            현재가{sortArrow("price")}
+          </div>
+          <div className="text-right cursor-pointer hover:text-slate-600" onClick={() => clickSort("chg")}>
+            변동{sortArrow("chg")}
+          </div>
           <div className="text-right">추세</div>
         </div>
         <div className="max-h-[30rem] overflow-auto rounded-b-xl">
-          {rows.map((r) => {
+          {sortedRows.map((r) => {
             const col = colorOf(r.product_id);
             const on = col != null;
             const ts = tsMap[String(r.product_id)];

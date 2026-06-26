@@ -24,6 +24,32 @@ export default function ProductResults({
     [rows, showOff]
   );
 
+  // 컬럼 정렬(헤더 클릭 → 오름/내림 토글). 용량은 밴드의 첫 숫자로 정렬.
+  type SortKey = "name" | "cap" | "price" | "chg";
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" } | null>(null);
+  const clickSort = (key: SortKey) =>
+    setSort((s) =>
+      s?.key === key
+        ? { key, dir: s.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: key === "name" ? "asc" : "desc" }
+    );
+  const sorted = useMemo(() => {
+    if (!sort) return visible;
+    const capNum = (b: string | null) => {
+      const m = (b || "").match(/\d+(?:\.\d+)?/);
+      return m ? parseFloat(m[0]) : -1;
+    };
+    const dir = sort.dir === "asc" ? 1 : -1;
+    return [...visible].sort((a, b) => {
+      let c = 0;
+      if (sort.key === "name") c = a.model_name.localeCompare(b.model_name, "ko");
+      else if (sort.key === "cap") c = capNum(a.capacity_band) - capNum(b.capacity_band);
+      else if (sort.key === "price") c = a.current_price - b.current_price;
+      else c = (a.change_pct ?? -Infinity) - (b.change_pct ?? -Infinity);
+      return c * dir;
+    });
+  }, [visible, sort]);
+
   // 현재 필터 결과의 가격 요약(평균·중앙값·최저·최고).
   // '전체' 모드에서 일시불가와 렌탈 월요금이 섞이면 평균이 왜곡되므로,
   // 렌탈 모드일 때만 월요금 기준으로 계산하고 그 외엔 일시불(비렌탈)만 집계.
@@ -87,7 +113,7 @@ export default function ProductResults({
                   { key: "current_price", label: "현재가" },
                   { key: "change_pct", label: "변동률(%)" },
                 ],
-                visible
+                sorted
               )
             }
             className={csvBtnClass}
@@ -132,14 +158,27 @@ export default function ProductResults({
         <table className="w-full text-sm table-fixed">
           <thead className="bg-slate-50 text-slate-500 text-xs sticky top-0 z-10">
             <tr>
-              <th className="text-left px-3 py-2">제품</th>
-              <th className="text-left px-3 py-2 w-16">용량</th>
-              <th className="text-right px-3 py-2 w-28">현재가</th>
-              <th className="text-right px-3 py-2 w-16">변동</th>
+              {([
+                { k: "name", label: "제품", align: "text-left", w: "" },
+                { k: "cap", label: "용량", align: "text-left", w: "w-16" },
+                { k: "price", label: "현재가", align: "text-right", w: "w-28" },
+                { k: "chg", label: "변동", align: "text-right", w: "w-16" },
+              ] as const).map((col) => (
+                <th
+                  key={col.k}
+                  onClick={() => clickSort(col.k)}
+                  className={`${col.align} ${col.w} px-3 py-2 cursor-pointer select-none hover:text-slate-700`}
+                >
+                  {col.label}
+                  <span className="text-own ml-0.5">
+                    {sort?.key === col.k ? (sort.dir === "asc" ? "▲" : "▼") : ""}
+                  </span>
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {visible.map((r) => (
+            {sorted.map((r) => (
               <tr
                 key={r.product_id}
                 onClick={() => onSelect(r.product_id)}
