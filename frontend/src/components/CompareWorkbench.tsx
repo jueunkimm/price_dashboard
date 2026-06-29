@@ -46,39 +46,43 @@ export default function CompareWorkbench({
 }) {
   const [tsMap, setTsMap] = useState<Record<string, Timeseries>>({});
   const [selected, setSelected] = useState<number[]>([]);
-  const [sort, setSort] = useState<{ key: "name" | "price" | "chg"; dir: "asc" | "desc" } | null>(null);
+  const [sort, setSort] = useState<{ key: "name" | "cat" | "price" | "chg"; dir: "asc" | "desc" } | null>(null);
+  const [catFilter, setCatFilter] = useState<string>(""); // "" = 전체 카테고리
 
-  const clickSort = (key: "name" | "price" | "chg") =>
+  // 랭킹에 등장하는 카테고리 목록(가나다순) — 카테고리별 비교용 드롭다운
+  const catList = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.category_name).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko")),
+    [rows]
+  );
+
+  const clickSort = (key: "name" | "cat" | "price" | "chg") =>
     setSort((s) =>
-      s?.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: key === "name" ? "asc" : "desc" }
+      s?.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: key === "chg" ? "desc" : "asc" }
     );
   const sortArrow = (key: string) =>
     sort?.key === key ? <span className="text-own ml-0.5">{sort.dir === "asc" ? "▲" : "▼"}</span> : null;
   const sortedRows = useMemo(() => {
-    if (!sort) return rows;
+    const base = catFilter ? rows.filter((r) => r.category_name === catFilter) : rows;
+    if (!sort) return base;
     const dir = sort.dir === "asc" ? 1 : -1;
-    return [...rows].sort((a, b) => {
+    return [...base].sort((a, b) => {
+      if (sort.key === "cat") {
+        // 카테고리 그룹(방향 토글) 1차, 동일 카테고리 내 변동률 큰 순 2차
+        const cc = a.category_name.localeCompare(b.category_name, "ko");
+        if (cc !== 0) return cc * dir;
+        return (b.change_pct ?? -Infinity) - (a.change_pct ?? -Infinity);
+      }
       let c = 0;
       if (sort.key === "name") c = a.model_name.localeCompare(b.model_name, "ko");
       else if (sort.key === "price") c = a.current_price - b.current_price;
       else c = (a.change_pct ?? -Infinity) - (b.change_pct ?? -Infinity);
       return c * dir;
     });
-  }, [rows, sort]);
+  }, [rows, sort, catFilter]);
 
   useEffect(() => {
     api.timeseriesAll().then(setTsMap).catch(() => setTsMap({}));
   }, []);
-
-  // 랭킹 상위에서 초기 비교 3개 자동 선택(시계열 보유 제품)
-  useEffect(() => {
-    if (selected.length || !rows.length || !Object.keys(tsMap).length) return;
-    const seed = rows
-      .filter((r) => (tsMap[String(r.product_id)]?.series.length ?? 0) >= 2)
-      .slice(0, 3)
-      .map((r) => r.product_id);
-    if (seed.length) setSelected(seed);
-  }, [rows, tsMap, selected.length]);
 
   const toggle = (id: number) =>
     setSelected((s) => {
@@ -136,7 +140,33 @@ export default function CompareWorkbench({
       <div className="rounded-xl bg-white border border-slate-100 shadow-sm min-w-0">
         <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-50 flex-wrap">
           <span className="text-sm font-semibold text-slate-700">가격 변동 랭킹</span>
-          <span className="text-[11px] text-slate-400">{rows.length}개 · 행 클릭 → 비교 추가</span>
+          <span className="text-[11px] text-slate-400">{sortedRows.length}개 · 행 클릭 → 비교 추가</span>
+          <div className="ml-auto flex items-center gap-1.5">
+            <select
+              value={catFilter}
+              onChange={(e) => setCatFilter(e.target.value)}
+              className="text-[11px] text-slate-600 border border-slate-200 rounded px-1.5 py-1 bg-white max-w-[9rem] focus:outline-none focus:ring-1 focus:ring-own/40"
+              title="카테고리로 필터"
+            >
+              <option value="">전체 카테고리</option>
+              {catList.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => clickSort("cat")}
+              className={`text-[11px] rounded px-1.5 py-1 border ${
+                sort?.key === "cat"
+                  ? "border-own text-own bg-own/5"
+                  : "border-slate-200 text-slate-500 hover:text-slate-700"
+              }`}
+              title="카테고리별로 묶어 정렬(같은 카테고리는 변동 큰 순)"
+            >
+              카테고리순{sortArrow("cat")}
+            </button>
+          </div>
         </div>
         <div className="grid grid-cols-[28px_1fr_104px_84px_64px] gap-2 px-3 py-1.5 bg-slate-50/70 border-b border-slate-100 text-[11px] font-semibold text-slate-400 select-none">
           <div />
@@ -198,6 +228,15 @@ export default function CompareWorkbench({
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-50 flex-wrap">
           <span className="text-sm font-semibold text-slate-700">제품 비교</span>
           <span className="text-[11px] font-medium text-own bg-own/10 px-2 py-0.5 rounded">{selected.length}개 선택</span>
+          {selected.length > 0 && (
+            <button
+              onClick={() => setSelected([])}
+              className="text-[11px] text-slate-400 hover:text-rose-500 hover:underline"
+              title="선택한 제품 전체 해제"
+            >
+              전체 해제
+            </button>
+          )}
           <span className="ml-auto text-[11px] text-slate-400">첫 값=100 지수 · 가격대 달라도 추세 비교</span>
         </div>
         <div className="px-2 pt-3">
