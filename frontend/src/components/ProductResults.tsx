@@ -16,12 +16,20 @@ export default function ProductResults({
   const [rows, setRows] = useState<FilteredProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const [showOff, setShowOff] = useState(false); // 타분류 추정(off_category) 표시 여부
+  const [showAcc, setShowAcc] = useState(false); // 별매품(부품·소모품) 표시 여부
 
-  // 기본은 오배치(off_category)를 숨겨 목록 신뢰도를 높이고, 토글로 투명하게 확인 가능.
-  const offCount = useMemo(() => rows.filter((r) => r.off_category).length, [rows]);
+  // 기본은 오배치/별매품을 숨겨 본품 비교 신뢰도를 높이고, 토글로 투명하게 확인 가능.
+  const offCount = useMemo(
+    () => rows.filter((r) => r.off_category && !r.is_accessory).length,
+    [rows]
+  );
+  const accCount = useMemo(() => rows.filter((r) => r.is_accessory).length, [rows]);
   const visible = useMemo(
-    () => (showOff ? rows : rows.filter((r) => !r.off_category)),
-    [rows, showOff]
+    () =>
+      rows.filter(
+        (r) => (showOff || !r.off_category) && (showAcc || !r.is_accessory)
+      ),
+    [rows, showOff, showAcc]
   );
 
   // 컬럼 정렬(헤더 클릭 → 오름/내림 토글). 용량은 밴드의 첫 숫자로 정렬.
@@ -56,7 +64,7 @@ export default function ProductResults({
   const stat = useMemo(() => {
     // 오배치(off_category) 제품은 가격 평균을 흐리므로 통계에서 제외
     const base = (filters.pricing === "rental" ? rows : rows.filter((r) => !r.is_rental)).filter(
-      (r) => !r.off_category
+      (r) => !r.off_category && !r.is_accessory
     );
     const prices = base.map((r) => r.current_price).sort((a, b) => a - b);
     if (!prices.length) return null;
@@ -95,6 +103,15 @@ export default function ProductResults({
               title="네이버 분류가 이 카테고리와 달라 오배치로 추정되는 제품"
             >
               {showOff ? `타분류 추정 ${offCount}건 숨기기` : `타분류 추정 ${offCount}건 보기`}
+            </button>
+          )}
+          {accCount > 0 && (
+            <button
+              onClick={() => setShowAcc((v) => !v)}
+              className="text-[11px] text-violet-500 hover:underline shrink-0"
+              title="부품·소모품(별매품) — 본품 비교·가격 통계에서 제외됨"
+            >
+              {showAcc ? `별매품 ${accCount}건 숨기기` : `별매품 ${accCount}건 보기`}
             </button>
           )}
         </span>
@@ -149,8 +166,8 @@ export default function ProductResults({
         <div className="py-12 text-center text-slate-400 text-sm">
           {loading
             ? "불러오는 중…"
-            : offCount > 0
-            ? "표시할 제품이 없습니다(타분류 추정 제외). 위 ‘보기’로 확인하세요."
+            : offCount > 0 || accCount > 0
+            ? "표시할 본품이 없습니다(타분류·별매품 제외). 위 ‘보기’로 확인하세요."
             : "조건에 맞는 제품이 없습니다."}
         </div>
       ) : (
@@ -195,6 +212,9 @@ export default function ProductResults({
                         )}
                         {r.off_category && (
                           <span className="shrink-0 text-[10px] bg-orange-100 text-orange-600 px-1 py-0.5 rounded" title="네이버 분류가 이 카테고리와 달라 가격 통계에서 제외됨">타분류?</span>
+                        )}
+                        {r.is_accessory && (
+                          <span className="shrink-0 text-[10px] bg-violet-100 text-violet-600 px-1 py-0.5 rounded" title="별매품(부품·소모품) — 본품 비교·가격 통계에서 제외됨">별매품</span>
                         )}
                         {/* 링크 있으면 상품 페이지(↗), 없으면 네이버 쇼핑 검색으로 폴백(모두 클릭 가능) */}
                         <a

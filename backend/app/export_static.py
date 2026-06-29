@@ -45,8 +45,12 @@ def _write(out: Path, name: str, data) -> None:
 
 
 def _all_products(db) -> list[dict]:
-    """부품 제외 전 제품 + 현재가/변동/용량/몰 (프론트 필터용, dedup 전)."""
-    products = aggregation._load_products(db, False, exclude_rental=False, exclude_accessory=True)
+    """제품 + 현재가/변동/용량/몰 (프론트 필터용, dedup 전).
+
+    별매품(부품/소모품)도 포함하되 is_accessory 플래그를 실어 프론트에서 배지·토글로
+    구분한다. 가격 통계/비교/포지셔닝은 프론트에서 is_accessory를 제외(렌탈·오배치와 동일).
+    """
+    products = aggregation._load_products(db, False, exclude_rental=False, exclude_accessory=False)
     snaps = aggregation._snaps_by_product(db, [p.id for p in products])
     cats = {c.id: c.name for c in db.scalars(select(Category)).all()}
     brands = {b.id: b.name for b in db.scalars(select(Brand)).all()}
@@ -98,6 +102,7 @@ def _all_products(db) -> list[dict]:
                 "brand": brands.get(p.brand_id, "기타/미상") if p.brand_id else "기타/미상",
                 "is_own_brand": p.is_own_brand,
                 "is_rental": p.is_rental,
+                "is_accessory": p.is_accessory,
                 "model_key": p.model_key,
                 "sub_category": sub,
                 # 네이버 상위분류가 카테고리 대표와 다르면 오배치(가격 통계에서 제외)

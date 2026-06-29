@@ -227,6 +227,7 @@ export interface FilteredProduct {
   link: string | null;
   is_own_brand: boolean;
   is_rental: boolean;
+  is_accessory: boolean; // 별매품(부품·소모품) — 통계·비교 제외, 목록은 토글로 표시
   current_price: number;
   change_pct: number | null;
 }
@@ -290,10 +291,17 @@ function dedup(rows: PRow[]): PRow[] {
   return [...out, ...groups.values()];
 }
 
-function applyFilters(rows: PRow[], f: ProductFilters, ownOnly: boolean): PRow[] {
+function applyFilters(
+  rows: PRow[],
+  f: ProductFilters,
+  ownOnly: boolean,
+  includeAccessory = false
+): PRow[] {
   // 일시불(기본)·렌탈만·전체. 구 exclude_rental 플래그도 계속 지원.
   const pricing = f.pricing ?? (f.exclude_rental === false ? "all" : "onetime");
   const filtered = rows.filter((p) => {
+    // 별매품은 기본 제외(통계·검색 보호). 제품목록만 토글로 포함(includeAccessory).
+    if (!includeAccessory && p.is_accessory) return false;
     if (pricing === "onetime" && p.is_rental) return false;
     if (pricing === "rental" && !p.is_rental) return false;
     if ((ownOnly || f.own_only) && !p.is_own_brand) return false;
@@ -331,7 +339,7 @@ export const api = {
   // 동급(용량) 포지셔닝 — products.json에서 브라우저 계산(어떤 제품끼리 비교했는지 포함)
   positioningSegmented: () =>
     loadJSON<PRow[]>("products").then((rows) => {
-      const clean = dedup(rows.filter((p) => !p.is_rental));
+      const clean = dedup(rows.filter((p) => !p.is_rental && !p.is_accessory));
       const groups = new Map<string, PRow[]>();
       for (const p of clean) {
         if (!p.capacity_band) continue;
@@ -412,7 +420,8 @@ export const api = {
 
   productSearch: (f: ProductFilters) =>
     loadJSON<PRow[]>("products").then((rows) =>
-      applyFilters(rows, f, !!f.own_only)
+      // 별매품 포함 반환(목록에서 배지+토글로 구분) — 통계는 컴포넌트에서 제외
+      applyFilters(rows, f, !!f.own_only, true)
         .sort((a, b) => a.current_price - b.current_price)
         .slice(0, 200)
     ),
@@ -420,7 +429,7 @@ export const api = {
   // ③ 모델 경쟁 스코어카드 — 선택 제품의 동급(카테고리·용량·세부유형) 포지션
   scorecard: (productId: number) =>
     loadJSON<PRow[]>("products").then((rows): Scorecard | null => {
-      const clean = rows.filter((p) => !p.is_rental && !p.off_category);
+      const clean = rows.filter((p) => !p.is_rental && !p.off_category && !p.is_accessory);
       const dd = dedup(clean); // 모델 단위 최저가 대표
       const clicked = clean.find((p) => p.product_id === productId);
       if (!clicked) return null;
