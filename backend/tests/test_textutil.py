@@ -38,6 +38,12 @@ class TestAccessoryConsumables:
         assert not a("오랄비 전동칫솔 D103 바이탈리티 프로 (핸들1+리필모3+충전기)")
         assert not a("쿠쿠언더싱크 정수기 싱크대정수기 정수 필터 자가설치 3세대")
 
+    def test_part_after_appliance_is_accessory(self):
+        from app.textutil import is_accessory_title as a
+        # 본품 명사 뒤 부품 = 별매품 / 부품명이 앞(형태수식)이면 본품
+        assert a("쿠쿠 건조분쇄형 음식물처리기 건조통 CFD-ENL201DCGW CFD-EFF201DCNW")
+        assert not a("쿠쿠 건조분쇄형 강력건조통 음식물처리기 노블화이트 CFD-DNL301DCW")
+
 
 class TestResellerSpam:
     def test_reseller_spam_detected(self):
