@@ -22,6 +22,23 @@ class TestRental:
         assert not is_rental_title("쿠쿠전자 CUCKOO CRP-EHB0310FW 화이트 실버")
 
 
+class TestAccessoryConsumables:
+    def test_consumables_flagged(self):
+        from app.textutil import is_accessory_title as a
+        assert a("(본사정품) 쿠쿠 음식물처리기 교체용 3중복합탈취필터 CFD-ENL201DCGG")
+        assert a("쿠쿠 음식물처리기 활성탄 필터 CFD-FFF201DCGG 당일출고")
+        assert a("소다스트림 정품 탄산 가스 실린더 60L 신규구매")
+        assert a("워터픽 교체용 팁(개별)")
+        assert a("브라운 체온계 렌즈 필터 캡 리필 1박스 20개입")
+
+    def test_main_products_not_flagged(self):
+        from app.textutil import is_accessory_title as a
+        # 본품인데 소모품 단어가 '기능 언급'으로 들어간 경우 — 제외돼야 함
+        assert not a("쿠쿠 미생물 음식물처리기 12.5L 자동문열림 이중탈취 필터")
+        assert not a("오랄비 전동칫솔 D103 바이탈리티 프로 (핸들1+리필모3+충전기)")
+        assert not a("쿠쿠언더싱크 정수기 싱크대정수기 정수 필터 자가설치 3세대")
+
+
 class TestResellerSpam:
     def test_reseller_spam_detected(self):
         from app.textutil import is_reseller_spam

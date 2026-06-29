@@ -92,10 +92,22 @@ _ACCESSORY_KEYWORDS = (
 )
 
 
+# 본품/별매품 구분 보강 — 공백 무시(normalize) 후 검사하는 고정밀 소모품 신호.
+# 본품 오탐 회피를 위해 '교체용 필터·활성탄필터·복합탈취·탄산/가스 실린더·필터캡'처럼
+# 별매품에만 나타나는 어휘만 채택. (본품 음식물처리기의 '이중탈취 필터', 전동칫솔 '핸들+
+# 리필모' 번들, 언더싱크 '정수 필터'는 의도적으로 제외 — 오탐 방지)
+_ACCESSORY_NORM = (
+    "교체용", "활성탄필터", "복합탈취", "탄산실린더", "가스실린더", "필터캡", "리필모교체",
+)
+
+
 def is_accessory_title(title: str) -> bool:
-    """제목에 부품/소모품 신호가 있으면 True."""
+    """제목에 부품/소모품(별매품) 신호가 있으면 True."""
     t = title or ""
-    return any(k in t for k in _ACCESSORY_KEYWORDS)
+    if any(k in t for k in _ACCESSORY_KEYWORDS):
+        return True
+    n = t.replace(" ", "").lower()
+    return any(k in n for k in _ACCESSORY_NORM)
 
 
 # 리셀러(드롭십) 스팸 — '쿠쿠' 브랜드 검색에 딸려오지만 카테고리와 무관한 잡화를
