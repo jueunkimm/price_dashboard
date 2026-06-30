@@ -248,7 +248,10 @@ def aggregation_kpi(db, own_only: bool) -> dict:
     """routes.kpi 로직 재현."""
     cats = aggregation.category_overview(db, is_own_only=own_only)
     ranking = aggregation.movement_ranking(db, is_own_only=own_only, limit=10000)
-    changes = [c["median_change_pct"] for c in cats if c["median_change_pct"] is not None]
+    # 평균 변동률: '카테고리 중앙값의 평균'은 대부분 제품이 무변동(0%)이라 항상 0.00%로 수렴해
+    # 실제 시장 움직임을 못 담음. → 제품(모델) 단위 변동률 평균으로 계산.
+    # ranking 모집단 재사용(렌탈·부품 제외 + 모델 dedup + 무변동 null 제외) — top_up/down과 동일 기준.
+    changes = [r["change_pct"] for r in ranking if r.get("change_pct") is not None]
     anomalies = sum(c["anomaly_count"] for c in cats)
     top_up = max(ranking, key=lambda r: r["change_pct"], default=None)
     top_down = min(ranking, key=lambda r: r["change_pct"], default=None)

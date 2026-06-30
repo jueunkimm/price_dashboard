@@ -37,8 +37,10 @@ def health(db: Session = Depends(get_db)):
 def kpi(own_only: bool = Query(False), db: Session = Depends(get_db)):
     """상단 KPI 요약 바(E-1)."""
     cats = aggregation.category_overview(db, is_own_only=own_only)
-    ranking = aggregation.movement_ranking(db, is_own_only=own_only, limit=1000)
-    changes = [c["median_change_pct"] for c in cats if c["median_change_pct"] is not None]
+    ranking = aggregation.movement_ranking(db, is_own_only=own_only, limit=10000)
+    # 평균 변동률: '카테고리 중앙값의 평균'은 대부분 무변동(0%)이라 0.00%로 수렴 → 무의미.
+    # 제품(모델) 단위 변동률 평균으로 계산(렌탈·부품 제외 + dedup + 무변동 null 제외).
+    changes = [r["change_pct"] for r in ranking if r.get("change_pct") is not None]
     anomalies = sum(c["anomaly_count"] for c in cats)
     top_up = max(ranking, key=lambda r: r["change_pct"], default=None)
     top_down = min(ranking, key=lambda r: r["change_pct"], default=None)
