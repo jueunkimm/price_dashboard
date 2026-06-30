@@ -3,147 +3,200 @@ import {
   api,
   type CategoryOverview,
   type Kpi,
+  type Macro,
   type ProductFilters,
   type RankingRow,
 } from "./api";
-import KpiBar from "./components/KpiBar";
-import CompareWorkbench from "./components/CompareWorkbench";
-import CategoryNav from "./components/CategoryNav";
-import OwnLineupSummary from "./components/OwnLineupSummary";
-import SignalStrip from "./components/SignalStrip";
-import TrendChart from "./components/TrendChart";
-import PositioningPanel from "./components/PositioningPanel";
-import CollectionStatus from "./components/CollectionStatus";
-import EventsPanel from "./components/EventsPanel";
-import DemandPanel from "./components/DemandPanel";
-import AlertsPanel from "./components/AlertsPanel";
-import ReportPanel from "./components/ReportPanel";
-import MacroChip from "./components/MacroChip";
-import DataQualityBanner from "./components/DataQualityBanner";
-import BrandComparePanel from "./components/BrandComparePanel";
-import SearchBox from "./components/SearchBox";
-import FilterBar from "./components/FilterBar";
-import ProductResults from "./components/ProductResults";
-import Scorecard from "./components/Scorecard";
-import QAPanel from "./components/QAPanel";
+import { won } from "./format";
+import { C } from "./components/dash/util";
+import MarketTab from "./components/dash/MarketTab";
+import CuckooTab from "./components/dash/CuckooTab";
+import AlertsTab from "./components/dash/AlertsTab";
+import CategoryDetail from "./components/dash/CategoryDetail";
 
-const TODAY = "2026-06-01";
+const BASE_DATE = "2026-06-01";
+const TODAY = "2026-06-30";
 
-type Tab = "market" | "own" | "alerts";
+type Tab = "market" | "cuckoo" | "alerts";
 const TABS: { key: Tab; label: string }[] = [
   { key: "market", label: "시장 현황" },
-  { key: "own", label: "쿠쿠 분석" },
+  { key: "cuckoo", label: "쿠쿠 분석" },
   { key: "alerts", label: "알림·이벤트" },
 ];
+
+// 디자인 핸드오프 KPI 스트립 (시장·쿠쿠 탭)
+function KpiStrip({ kpi }: { kpi: Kpi | null }) {
+  if (!kpi) {
+    return (
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="bg-white border border-[#e9e9ee] rounded-[14px] px-[18px] py-4 animate-pulse h-[88px]" />
+        ))}
+      </div>
+    );
+  }
+  const fmtPct = (n: number | null | undefined) => (n == null ? "-" : (n > 0 ? "+" : "") + n.toFixed(2) + "%");
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className="bg-white border border-[#e9e9ee] rounded-[14px] px-[18px] py-4">
+        <div className="text-xs text-[#8e8e99] font-semibold">트래킹 제품 수</div>
+        <div className="text-[26px] font-extrabold tracking-[-0.02em] mt-1.5 tabular-nums">
+          {kpi.product_count.toLocaleString("ko-KR")}
+        </div>
+      </div>
+      <div className="bg-white border border-[#e9e9ee] rounded-[14px] px-[18px] py-4">
+        <div className="text-xs text-[#8e8e99] font-semibold">평균 변동률</div>
+        <div className="text-[26px] font-extrabold tracking-[-0.02em] mt-1.5 tabular-nums">
+          {kpi.avg_change_pct == null ? "-" : kpi.avg_change_pct.toFixed(2) + "%"}
+        </div>
+      </div>
+      <div className="bg-white border border-[#e9e9ee] rounded-[14px] px-[18px] py-4">
+        <div className="text-xs text-[#8e8e99] font-semibold">급변 제품 수</div>
+        <div className="text-[26px] font-extrabold tracking-[-0.02em] mt-1.5 tabular-nums" style={{ color: C.up }}>
+          {kpi.anomaly_count.toLocaleString("ko-KR")}
+        </div>
+      </div>
+      <div className="bg-white border border-[#e9e9ee] rounded-[14px] px-[18px] py-4">
+        <div className="text-xs text-[#8e8e99] font-semibold">최대 등락</div>
+        <div className="flex flex-col gap-[3px] mt-2">
+          <span className="text-[15px] font-bold tabular-nums" style={{ color: C.up }}>
+            ▲ {fmtPct(kpi.top_up?.change_pct)}
+            {kpi.top_up && <span className="text-[#9a9aa2] font-medium text-xs"> · {won(kpi.top_up.current_price)}</span>}
+          </span>
+          <span className="text-[15px] font-bold tabular-nums" style={{ color: C.down }}>
+            ▼ {fmtPct(kpi.top_down?.change_pct)}
+            {kpi.top_down && <span className="text-[#9a9aa2] font-medium text-xs"> · {won(kpi.top_down.current_price)}</span>}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const [ownOnly, setOwnOnly] = useState(false);
   const [tab, setTab] = useState<Tab>("market");
+  const [q, setQ] = useState("");
   const [kpi, setKpi] = useState<Kpi | null>(null);
   const [cats, setCats] = useState<CategoryOverview[]>([]);
   const [ranking, setRanking] = useState<RankingRow[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
-  const [filters, setFilters] = useState<ProductFilters>({ exclude_rental: true });
+  const [macro, setMacro] = useState<Macro | null>(null);
+  const [collected, setCollected] = useState<string>("");
+  const [filters, setFilters] = useState<ProductFilters>({ pricing: "onetime" });
   const [err, setErr] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setErr(null);
-    setLoading(true);
     Promise.all([api.kpi(ownOnly), api.categories(ownOnly), api.ranking(ownOnly, 200)])
       .then(([k, c, r]) => {
         setKpi(k);
         setCats(c);
         setRanking(r);
       })
-      .catch((e) => setErr(String(e)))
-      .finally(() => setLoading(false));
+      .catch((e) => setErr(String(e)));
   }, [ownOnly]);
 
-  const patchFilters = (patch: Partial<ProductFilters>) =>
-    setFilters((f) => ({ ...f, ...patch }));
+  useEffect(() => {
+    api.macro().then(setMacro).catch(() => setMacro(null));
+    api
+      .collectionLogs(1)
+      .then((logs) => {
+        const f = logs[0]?.finished_at;
+        if (f) {
+          const d = new Date(f);
+          if (!isNaN(d.getTime())) setCollected(d.toLocaleString("ko-KR"));
+        }
+      })
+      .catch(() => setCollected(""));
+  }, []);
 
-  // 선택된 카테고리(사이드바/그리드 공유)
+  const patchFilters = (patch: Partial<ProductFilters>) => setFilters((f) => ({ ...f, ...patch }));
+
   const selectedCat = useMemo(
     () => cats.find((c) => c.category_id === filters.category_id) ?? null,
     [cats, filters.category_id]
   );
 
-  const pickProduct = (id: number) => {
-    setSelectedProduct(id);
+  const pickCategory = (categoryId: number) => {
+    patchFilters({ category_id: categoryId });
     setTab("market");
   };
+  const clearCategory = () =>
+    patchFilters({ category_id: undefined, capacity_band: undefined, brand_id: undefined, sub_category: undefined });
 
-  const Legend = (
-    <div className="flex items-center gap-3 text-[11px] text-slate-400">
-      <span>
-        <span className="text-up">▲ 빨강</span> = 가격 상승
-      </span>
-      <span>
-        <span className="text-down">▼ 파랑</span> = 가격 하락
-      </span>
-      <span className="text-slate-300">· 변동률은 직전 수집 대비</span>
-    </div>
-  );
-
-  const KpiArea =
-    loading && !kpi ? (
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="rounded-xl bg-white p-4 border border-slate-100 animate-pulse">
-            <div className="h-3 w-16 bg-slate-100 rounded mb-2" />
-            <div className="h-5 w-24 bg-slate-100 rounded" />
-          </div>
-        ))}
-      </div>
-    ) : (
-      <KpiBar kpi={kpi} ownOnly={ownOnly} />
-    );
+  const totalCount = kpi?.product_count ?? 0;
+  const showKpi = tab !== "alerts" && !selectedCat;
 
   return (
     <div className="min-h-screen">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
-          <div className="min-w-0">
-            <h1 className="text-base sm:text-lg font-bold truncate">
-              가전 가격트래킹 대시보드
-              <span className="ml-2 text-[11px] font-normal text-slate-400">{TODAY} 기준</span>
-            </h1>
-            <CollectionStatus />
+      {/* 헤더 */}
+      <header className="sticky top-0 z-20 bg-white/90 backdrop-blur-[8px] border-b border-[#e6e6ec]">
+        <div className="max-w-[1240px] mx-auto px-6 pt-3.5">
+          <div className="flex items-start gap-5">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-[26px] h-[26px] rounded-[7px] bg-ink text-white flex items-center justify-center text-[13px] font-extrabold">
+                  가
+                </div>
+                <h1 className="text-[18px] font-extrabold tracking-[-0.02em] truncate">가전 가격트래킹 대시보드</h1>
+                <span className="text-xs text-[#9a9aa2] font-medium shrink-0">{BASE_DATE} 기준</span>
+              </div>
+              <div className="flex items-center gap-2 mt-1.5 text-xs text-[#8e8e99] flex-wrap">
+                <span className="w-[7px] h-[7px] rounded-full bg-[#3fa56a] inline-block" />
+                <span>최근 수집 {collected || "—"}</span>
+                <span className="text-[#d3d3da]">·</span>
+                <span>
+                  {cats.length}개 카테고리 · {totalCount.toLocaleString("ko-KR")}건
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5 pt-0.5 shrink-0">
+              <div className="hidden sm:flex items-center gap-1.5 bg-[#f1f1f4] border border-[#e6e6ec] rounded-[9px] px-3 py-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9a9aa2" strokeWidth="2.2">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
+                <input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="제품·카테고리 검색"
+                  className="bg-transparent outline-none w-[150px] text-[13px]"
+                />
+              </div>
+              <div className="hidden md:flex flex-col items-end border border-[#e6e6ec] rounded-[9px] px-3 py-1.5 bg-white">
+                <span className="text-[10px] text-[#9a9aa2] font-semibold tracking-wide">USD / KRW</span>
+                <span className="text-[13px] font-bold tabular-nums">
+                  {macro?.latest != null ? macro.latest.toFixed(1) : "—"}
+                  <span className="text-up text-[11px] ml-0.5">▲</span>
+                </span>
+              </div>
+              <button
+                onClick={() => setOwnOnly((v) => !v)}
+                className={`text-[13px] font-semibold px-4 py-2.5 rounded-[9px] ${
+                  ownOnly ? "bg-own text-white" : "bg-ink text-white"
+                }`}
+              >
+                {ownOnly ? "★ 쿠쿠만" : "전체 보기"}
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0 order-3 sm:order-2 w-full sm:w-auto">
-            <SearchBox ownOnly={ownOnly} onSelect={pickProduct} />
-          </div>
-          <div className="flex items-center gap-2 shrink-0 order-2 sm:order-3">
-            <MacroChip />
-            <button
-              onClick={() => setOwnOnly((v) => !v)}
-              className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition ${
-                ownOnly ? "bg-own text-white" : "bg-slate-100 text-slate-600"
-              }`}
-            >
-              {ownOnly ? "★ 쿠쿠만 보기" : "전체 보기"}
-            </button>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 flex gap-1">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition ${
-                tab === t.key
-                  ? "border-own text-own"
-                  : "border-transparent text-slate-400 hover:text-slate-600"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+          <nav className="flex gap-1 mt-3.5">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`px-4 pt-[11px] pb-[13px] text-[14px] font-semibold border-b-2 -mb-px transition ${
+                  tab === t.key ? "border-own text-ink" : "border-transparent text-[#9a9aa2] hover:text-[#6b6b73]"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-5 space-y-6">
+      <main className="max-w-[1240px] mx-auto px-6 pt-[22px] pb-[72px] space-y-[22px]">
         {err && (
           <div className="rounded-lg bg-red-50 text-red-600 text-sm p-3 border border-red-100">
             데이터를 불러오지 못했습니다: {err}
@@ -153,151 +206,31 @@ export default function App() {
           </div>
         )}
 
-        <DataQualityBanner />
+        {showKpi && <KpiStrip kpi={kpi} />}
 
-        {tab === "market" && (
-          <div className="space-y-6">
-            <FilterBar cats={cats} filters={filters} onChange={patchFilters} />
-            <QAPanel />
+        {tab === "market" &&
+          (selectedCat ? (
+            <CategoryDetail
+              cat={selectedCat}
+              filters={filters}
+              ownOnly={ownOnly}
+              onPatchFilters={patchFilters}
+              onClear={clearCategory}
+            />
+          ) : (
+            <MarketTab
+              cats={cats}
+              ranking={ranking}
+              q={q}
+              filters={filters}
+              onFilters={patchFilters}
+              onPickCategory={pickCategory}
+            />
+          ))}
 
-            <div className="space-y-6">
-              {KpiArea}
+        {tab === "cuckoo" && <CuckooTab onPick={pickCategory} />}
 
-              {selectedCat ? (
-                // ── 카테고리 상세(사이드바 선택) ──
-                <>
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-semibold text-slate-700">
-                      {selectedCat.has_own_lineup ? "★ " : ""}
-                      {selectedCat.category_name}
-                      {filters.capacity_band && (
-                        <span className="text-own ml-1">· {filters.capacity_band}</span>
-                      )}
-                    </h2>
-                    <button
-                      onClick={() =>
-                        patchFilters({
-                          category_id: undefined,
-                          capacity_band: undefined,
-                          brand_id: undefined,
-                        })
-                      }
-                      className="text-xs text-own hover:underline"
-                    >
-                      전체 카테고리로 ✕
-                    </button>
-                  </div>
-
-                  <SignalStrip cat={selectedCat} />
-
-                  <BrandComparePanel
-                    categoryId={selectedCat.category_id}
-                    categoryName={selectedCat.category_name}
-                    filters={filters}
-                  />
-
-                  <div className="grid lg:grid-cols-5 gap-6">
-                    <section className="lg:col-span-3 min-w-0">
-                      <h2 className="text-sm font-semibold text-slate-500 mb-2">제품 목록</h2>
-                      <ProductResults
-                        filters={filters}
-                        ownOnly={ownOnly}
-                        onSelect={setSelectedProduct}
-                      />
-                    </section>
-                    <section className="lg:col-span-2 min-w-0 space-y-4">
-                      <div>
-                        <h2 className="text-sm font-semibold text-slate-500 mb-2">가격 추세</h2>
-                        <TrendChart productId={selectedProduct} />
-                      </div>
-                      {selectedProduct && (
-                        <div>
-                          <h2 className="text-sm font-semibold text-slate-500 mb-2">동급 경쟁 스코어카드</h2>
-                          <Scorecard productId={selectedProduct} />
-                        </div>
-                      )}
-                      <DemandPanel
-                        categoryId={selectedCat.category_id}
-                        categoryName={selectedCat.category_name}
-                        priceChange={selectedCat.median_change_pct}
-                      />
-                    </section>
-                  </div>
-                </>
-              ) : (
-                // ── 전체 개요(카테고리 미선택) ──
-                <>
-                  <OwnLineupSummary
-                    cats={cats}
-                    selectedId={filters.category_id ?? null}
-                    onSelect={(c) => patchFilters({ category_id: c.category_id })}
-                  />
-
-                  <ReportPanel />
-
-                  <section>
-                    <h2 className="text-sm font-semibold text-slate-500 mb-2">
-                      카테고리 탐색
-                      <span className="ml-2 text-xs font-normal text-slate-400">
-                        검색·그룹으로 품목 선택 → 상세
-                      </span>
-                    </h2>
-                    {loading && cats.length === 0 ? (
-                      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-                        {Array.from({ length: 8 }).map((_, i) => (
-                          <div
-                            key={i}
-                            className="rounded-xl bg-white p-4 border border-slate-100 animate-pulse h-24"
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <CategoryNav
-                        cats={cats}
-                        selectedId={filters.category_id ?? null}
-                        onSelect={(c) => patchFilters({ category_id: c?.category_id })}
-                      />
-                    )}
-                  </section>
-
-                  <section>
-                    <h2 className="text-sm font-semibold text-slate-500 mb-2 flex items-center gap-2 flex-wrap">
-                      비교 워크벤치
-                      <span className="text-xs font-normal text-slate-400">
-                        랭킹에서 제품을 클릭해 가격 추이 비교(최대 5)
-                      </span>
-                      <span className="ml-auto">{Legend}</span>
-                    </h2>
-                    <CompareWorkbench rows={ranking} onOpenDetail={setSelectedProduct} />
-                  </section>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {tab === "own" && (
-          <>
-            {KpiArea}
-            <div className="text-xs text-slate-400">
-              쿠쿠 가격 포지셔닝 — 부품·렌탈 제외, 모델 단위 집계. 동급(용량) 비교는 토글로 전환.
-            </div>
-            <PositioningPanel />
-          </>
-        )}
-
-        {tab === "alerts" && (
-          <div className="grid lg:grid-cols-2 gap-6">
-            <section>
-              <h2 className="text-sm font-semibold text-slate-500 mb-2">변동 알림</h2>
-              <AlertsPanel ownOnly={ownOnly} />
-            </section>
-            <section>
-              <h2 className="text-sm font-semibold text-slate-500 mb-2">시장 이벤트</h2>
-              <EventsPanel today={TODAY} />
-            </section>
-          </div>
-        )}
+        {tab === "alerts" && <AlertsTab ownOnly={ownOnly} today={TODAY} />}
       </main>
     </div>
   );
