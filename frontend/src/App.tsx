@@ -9,6 +9,7 @@ import {
 } from "./api";
 import { won } from "./format";
 import { C } from "./components/dash/util";
+import FilterCard from "./components/dash/FilterCard";
 import MarketTab from "./components/dash/MarketTab";
 import CuckooTab from "./components/dash/CuckooTab";
 import AlertsTab from "./components/dash/AlertsTab";
@@ -208,25 +209,23 @@ export default function App() {
 
         {showKpi && <KpiStrip kpi={kpi} />}
 
-        {tab === "market" &&
-          (selectedCat ? (
-            <CategoryDetail
-              cat={selectedCat}
-              filters={filters}
-              ownOnly={ownOnly}
-              onPatchFilters={patchFilters}
-              onClear={clearCategory}
-            />
-          ) : (
-            <MarketTab
-              cats={cats}
-              ranking={ranking}
-              q={q}
-              filters={filters}
-              onFilters={patchFilters}
-              onPickCategory={pickCategory}
-            />
-          ))}
+        {tab === "market" && (
+          <>
+            {/* 상세 필터는 전체현황·카테고리 상세 양쪽에서 항상 노출(정밀 분석 유지) */}
+            <FilterCard cats={cats} filters={filters} onFilters={patchFilters} onPickCategory={pickCategory} />
+            {selectedCat ? (
+              <CategoryDetail
+                cat={selectedCat}
+                filters={filters}
+                ownOnly={ownOnly}
+                onPatchFilters={patchFilters}
+                onClear={clearCategory}
+              />
+            ) : (
+              <MarketTab cats={cats} ranking={ranking} q={q} onPickCategory={pickCategory} />
+            )}
+          </>
+        )}
 
         {tab === "cuckoo" && <CuckooTab onPick={pickCategory} />}
 
