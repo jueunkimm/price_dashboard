@@ -15,8 +15,11 @@ import CuckooTab from "./components/dash/CuckooTab";
 import AlertsTab from "./components/dash/AlertsTab";
 import CategoryDetail from "./components/dash/CategoryDetail";
 
-const BASE_DATE = "2026-06-01";
-const TODAY = "2026-06-30";
+// 이벤트 타임라인 '오늘' 마커 — 실제 현재 날짜(로컬) 사용
+const TODAY = (() => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+})();
 
 type Tab = "market" | "cuckoo" | "alerts";
 const TABS: { key: Tab; label: string }[] = [
@@ -140,7 +143,6 @@ export default function App() {
                   가
                 </div>
                 <h1 className="text-[18px] font-extrabold tracking-[-0.02em] truncate">가전 가격트래킹 대시보드</h1>
-                <span className="text-xs text-[#9a9aa2] font-medium shrink-0">{BASE_DATE} 기준</span>
               </div>
               <div className="flex items-center gap-2 mt-1.5 text-xs text-[#8e8e99] flex-wrap">
                 <span className="w-[7px] h-[7px] rounded-full bg-[#3fa56a] inline-block" />
