@@ -132,6 +132,20 @@ export default function RankCompare({ rows, q }: { rows: RankingRow[]; q: string
                         </span>
                       )}
                       <span className="text-[13px] font-semibold truncate">{r.model_name}</span>
+                      {/* 상품 링크(있으면 상품페이지 ↗, 없으면 네이버쇼핑 검색 ⌕). 행 클릭(비교추가)과 분리 */}
+                      <a
+                        href={
+                          r.link ||
+                          `https://search.shopping.naver.com/search/all?query=${encodeURIComponent(r.model_name)}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        title={r.link ? "네이버 상품 페이지 열기" : "네이버 쇼핑에서 검색"}
+                        className="shrink-0 text-[#bcbcc4] hover:text-own text-[13px] leading-none"
+                      >
+                        {r.link ? "↗" : "⌕"}
+                      </a>
                     </div>
                     <div className="text-[11px] text-[#9a9aa2] mt-0.5">{r.category_name}</div>
                   </div>

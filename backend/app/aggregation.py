@@ -244,6 +244,7 @@ def movement_ranking(
                 "prev_price": r["prev_price"],
                 "change_pct": r["change_pct"],
                 "is_anomaly": abs(r["change_pct"]) >= threshold,
+                "link": p.link,
             }
         )
     rows.sort(key=lambda r: abs(r["change_pct"]), reverse=True)

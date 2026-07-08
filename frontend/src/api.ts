@@ -24,6 +24,7 @@ export interface RankingRow {
   prev_price: number | null;
   change_pct: number;
   is_anomaly: boolean;
+  link?: string | null; // 네이버 상품 페이지 링크(없으면 검색 폴백)
 }
 
 export interface Positioning {
@@ -421,9 +422,11 @@ export const api = {
   productSearch: (f: ProductFilters) =>
     loadJSON<PRow[]>("products").then((rows) =>
       // 별매품 포함 반환(목록에서 배지+토글로 구분) — 통계는 컴포넌트에서 제외
+      // 상한을 넉넉히(2000): 과거 200 컷 + 가격오름차순 정렬로 비싼 모델(예: 고가 밥솥)이
+      // 잘려 랭킹엔 뜨는데 목록엔 안 보이던 문제 방지. 카테고리 최대 수백 개라 절단 없음.
       applyFilters(rows, f, !!f.own_only, true)
         .sort((a, b) => a.current_price - b.current_price)
-        .slice(0, 200)
+        .slice(0, 2000)
     ),
 
   // ③ 모델 경쟁 스코어카드 — 선택 제품의 동급(카테고리·용량·세부유형) 포지션
