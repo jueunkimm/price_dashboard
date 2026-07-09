@@ -218,6 +218,7 @@ export interface Scorecard {
 export interface FilteredProduct {
   product_id: number;
   model_name: string;
+  category_id: number; // 검색 결과 → 카테고리 드릴다운 이동용
   category_name: string;
   brand: string;
   capacity_band: string | null;

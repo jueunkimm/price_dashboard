@@ -11,7 +11,8 @@ export default function ProductResults({
 }: {
   filters: ProductFilters;
   ownOnly: boolean;
-  onSelect: (productId: number) => void;
+  // categoryId도 전달 — 전체 검색 결과에서 행 클릭 시 해당 카테고리로 드릴다운할 수 있게
+  onSelect: (productId: number, categoryId?: number) => void;
 }) {
   const [rows, setRows] = useState<FilteredProduct[]>([]);
   const [loading, setLoading] = useState(false);
@@ -198,7 +199,7 @@ export default function ProductResults({
             {sorted.map((r) => (
               <tr
                 key={r.product_id}
-                onClick={() => onSelect(r.product_id)}
+                onClick={() => onSelect(r.product_id, r.category_id)}
                 className="border-t border-slate-50 hover:bg-slate-50 cursor-pointer align-top"
               >
                 <td className="px-3 py-2 overflow-hidden">
@@ -245,6 +246,10 @@ export default function ProductResults({
                         </a>
                       </div>
                       <div className="text-[11px] text-slate-400 truncate mt-0.5">
+                        {/* 전체 검색(카테고리 미선택) 시 어느 카테고리 제품인지 표시 */}
+                        {!filters.category_id && (
+                          <span className="text-own/80 font-medium">{r.category_name}{" · "}</span>
+                        )}
                         <span className="text-slate-500">{r.brand}</span>
                         {r.mall && (
                           <>

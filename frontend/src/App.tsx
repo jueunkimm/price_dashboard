@@ -14,6 +14,7 @@ import MarketTab from "./components/dash/MarketTab";
 import CuckooTab from "./components/dash/CuckooTab";
 import AlertsTab from "./components/dash/AlertsTab";
 import CategoryDetail from "./components/dash/CategoryDetail";
+import ProductResults from "./components/ProductResults";
 
 // 이벤트 타임라인 '오늘' 마커 — 실제 현재 날짜(로컬) 사용
 const TODAY = (() => {
@@ -224,7 +225,30 @@ export default function App() {
                 onClear={clearCategory}
               />
             ) : (
-              <MarketTab cats={cats} ranking={ranking} q={q} onPickCategory={pickCategory} />
+              <>
+                {/* 헤더 검색어는 랭킹(변동 있는 상위만)이 아니라 전체 제품(products.json)을 검색 */}
+                {q.trim() && (
+                  <section className="space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="text-[15px] font-bold text-ink">"{q.trim()}" 검색 결과</h2>
+                      <span className="text-xs text-[#9a9aa2]">
+                        전체 제품 대상 · 행 클릭 시 해당 카테고리 상세로
+                      </span>
+                      <button onClick={() => setQ("")} className="text-xs text-own hover:underline">
+                        검색 지우기 ✕
+                      </button>
+                    </div>
+                    <ProductResults
+                      filters={{ ...filters, q: q.trim() }}
+                      ownOnly={ownOnly}
+                      onSelect={(_, categoryId) => {
+                        if (categoryId) pickCategory(categoryId);
+                      }}
+                    />
+                  </section>
+                )}
+                <MarketTab cats={cats} ranking={ranking} q={q} onPickCategory={pickCategory} />
+              </>
             )}
           </>
         )}
