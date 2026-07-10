@@ -57,6 +57,7 @@ jobs:
           python -m collector.recategorize || true
           python -m collector.audit_categories || true
           python -m collector.evaluate_alerts
+          python -m collector.collect_macro --days 120 || echo "ECOS 키 없으면 건너뜀"
           python -m app.export_static
 
       - uses: actions/setup-node@v4

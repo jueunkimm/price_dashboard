@@ -124,8 +124,11 @@ export interface AlertItem {
 export interface Macro {
   metric: string;
   latest: number | null;
+  latest_date?: string | null; // 환율 기준일(ECOS 최신 영업일)
+  prev?: number | null; // 직전 영업일 값(등락 방향 표시용)
   is_synthetic: boolean;
   series: { date: string; value: number }[];
+  cny?: { latest: number | null; latest_date?: string | null; prev?: number | null };
 }
 
 export interface WeeklyReport {

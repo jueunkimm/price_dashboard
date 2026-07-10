@@ -22,14 +22,11 @@ class EcosClient:
                 "https://ecos.bok.or.kr/api 에서 발급 후 추가하세요."
             )
 
-    def usd_krw(self, start: str, end: str) -> list[dict]:
-        """원/달러 환율 일별 시계열. start/end: 'YYYYMMDD'.
-
-        통계표 731Y001(주요국 통화의 대원화환율), 항목 0000001(미국 달러).
-        """
+    def _fx(self, item_code: str, start: str, end: str) -> list[dict]:
+        """통계표 731Y001(주요국 통화의 대원화환율) 일별 시계열. start/end: 'YYYYMMDD'."""
         url = (
             f"{ECOS_BASE}/{self.api_key}/json/kr/1/1000/"
-            f"731Y001/D/{start}/{end}/0000001"
+            f"731Y001/D/{start}/{end}/{item_code}"
         )
         with httpx.Client(timeout=10.0) as client:
             resp = client.get(url)
@@ -43,3 +40,11 @@ class EcosClient:
             except (KeyError, ValueError):
                 continue
         return out
+
+    def usd_krw(self, start: str, end: str) -> list[dict]:
+        """원/달러 환율 — 항목 0000001(미국 달러, 매매기준율)."""
+        return self._fx("0000001", start, end)
+
+    def cny_krw(self, start: str, end: str) -> list[dict]:
+        """원/위안 환율 — 항목 0000053(위안, 매매기준율)."""
+        return self._fx("0000053", start, end)

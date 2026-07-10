@@ -206,11 +206,22 @@ def export_all(out_dir: Path | None = None) -> dict:
         mrows = db.scalars(
             select(MacroMetric).where(MacroMetric.metric_type == "usd_krw").order_by(MacroMetric.period)
         ).all()
+        crows = db.scalars(
+            select(MacroMetric).where(MacroMetric.metric_type == "cny_krw").order_by(MacroMetric.period)
+        ).all()
         _write(out, "macro.json", {
+            # 기존 키(usd) 하위호환 유지 + 기준 시점(latest_date)·전일값(prev)·CNY 추가
             "metric": "usd_krw",
             "latest": mrows[-1].value if mrows else None,
+            "latest_date": mrows[-1].period.isoformat() if mrows else None,
+            "prev": mrows[-2].value if len(mrows) >= 2 else None,
             "is_synthetic": any(r.source == "demo_synthetic" for r in mrows),
             "series": [{"date": r.period.isoformat(), "value": r.value} for r in mrows],
+            "cny": {
+                "latest": crows[-1].value if crows else None,
+                "latest_date": crows[-1].period.isoformat() if crows else None,
+                "prev": crows[-2].value if len(crows) >= 2 else None,
+            },
         })
         _write(out, "report.json", report.weekly_report(db))
         _write(out, "data_quality.json", aggregation.data_quality(db))

@@ -101,9 +101,10 @@ export default function RankCompare({ rows, q }: { rows: RankingRow[]; q: string
             ))}
           </div>
         </div>
-        <div className="grid grid-cols-[34px_1fr_96px_92px_84px] gap-2 px-[18px] py-2.5 text-[11px] font-semibold text-[#9a9aa2] border-b border-[#f0f0f3]">
+        <div className="grid grid-cols-[34px_1fr_40px_96px_92px_84px] gap-2 px-[18px] py-2.5 text-[11px] font-semibold text-[#9a9aa2] border-b border-[#f0f0f3]">
           <div>#</div>
           <div>제품</div>
+          <div className="text-center">링크</div>
           <div className="text-right">현재가</div>
           <div className="text-right">변동률</div>
           <div className="text-right">추세</div>
@@ -120,7 +121,7 @@ export default function RankCompare({ rows, q }: { rows: RankingRow[]; q: string
                 <div
                   key={r.product_id}
                   onClick={() => toggle(r.product_id)}
-                  className="grid grid-cols-[34px_1fr_96px_92px_84px] gap-2 px-[18px] py-3 items-center border-b border-[#f4f4f6] cursor-pointer hover:bg-[#f8f8fb]"
+                  className="grid grid-cols-[34px_1fr_40px_96px_92px_84px] gap-2 px-[18px] py-3 items-center border-b border-[#f4f4f6] cursor-pointer hover:bg-[#f8f8fb]"
                   style={on ? { background: "#f5f5fd", boxShadow: `inset 3px 0 0 ${col}` } : undefined}
                 >
                   <div className="text-[13px] font-bold text-[#bcbcc4]">{idx + 1}</div>
@@ -132,22 +133,24 @@ export default function RankCompare({ rows, q }: { rows: RankingRow[]; q: string
                         </span>
                       )}
                       <span className="text-[13px] font-semibold truncate">{r.model_name}</span>
-                      {/* 상품 링크(있으면 상품페이지 ↗, 없으면 네이버쇼핑 검색 ⌕). 행 클릭(비교추가)과 분리 */}
-                      <a
-                        href={
-                          r.link ||
-                          `https://search.shopping.naver.com/search/all?query=${encodeURIComponent(r.model_name)}`
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        title={r.link ? "네이버 상품 페이지 열기" : "네이버 쇼핑에서 검색"}
-                        className="shrink-0 text-[#bcbcc4] hover:text-own text-[13px] leading-none"
-                      >
-                        {r.link ? "↗" : "⌕"}
-                      </a>
                     </div>
                     <div className="text-[11px] text-[#9a9aa2] mt-0.5">{r.category_name}</div>
+                  </div>
+                  {/* 링크 칼럼 — 상품페이지 ↗ / 네이버쇼핑 검색 ⌕. 행 클릭(비교추가)과 분리 */}
+                  <div className="flex justify-center">
+                    <a
+                      href={
+                        r.link ||
+                        `https://search.shopping.naver.com/search/all?query=${encodeURIComponent(r.model_name)}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      title={r.link ? "네이버 상품 페이지 열기" : "네이버 쇼핑에서 검색"}
+                      className="w-6 h-6 flex items-center justify-center rounded-md text-[#9a9aa2] hover:text-own hover:bg-own/10 text-[13px]"
+                    >
+                      {r.link ? "↗" : "⌕"}
+                    </a>
                   </div>
                   <div className="text-right text-[13px] font-bold tabular-nums">{won(r.current_price)}</div>
                   <div className="text-right text-[13px] font-bold tabular-nums" style={{ color: cc }}>

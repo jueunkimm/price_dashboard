@@ -29,6 +29,24 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "alerts", label: "알림·이벤트" },
 ];
 
+// 헤더 환율 셀 — 직전 영업일 대비 상승 ▲(빨강)/하락 ▼(파랑)/보합 ─
+function FxCell({ label, latest, prev }: { label: string; latest: number | null; prev: number | null }) {
+  const dir = latest != null && prev != null ? Math.sign(latest - prev) : 0;
+  return (
+    <div className="flex flex-col items-end">
+      <span className="text-[10px] text-[#9a9aa2] font-semibold tracking-wide">{label}</span>
+      <span className="text-[13px] font-bold tabular-nums">
+        {latest != null ? latest.toFixed(1) : "—"}
+        {latest != null && (
+          <span className={`text-[11px] ml-0.5 ${dir > 0 ? "text-up" : dir < 0 ? "text-down" : "text-[#bcbcc4]"}`}>
+            {dir > 0 ? "▲" : dir < 0 ? "▼" : "─"}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
+
 // 디자인 핸드오프 KPI 스트립 (시장·쿠쿠 탭)
 function KpiStrip({ kpi }: { kpi: Kpi | null }) {
   if (!kpi) {
@@ -167,12 +185,15 @@ export default function App() {
                   className="bg-transparent outline-none w-[150px] text-[13px]"
                 />
               </div>
+              {/* 환율 pill — USD·CNY(매매기준율) + 직전 영업일 대비 방향 + 기준일 */}
               <div className="hidden md:flex flex-col items-end border border-[#e6e6ec] rounded-[9px] px-3 py-1.5 bg-white">
-                <span className="text-[10px] text-[#9a9aa2] font-semibold tracking-wide">USD / KRW</span>
-                <span className="text-[13px] font-bold tabular-nums">
-                  {macro?.latest != null ? macro.latest.toFixed(1) : "—"}
-                  <span className="text-up text-[11px] ml-0.5">▲</span>
-                </span>
+                <div className="flex items-center gap-3">
+                  <FxCell label="USD/KRW" latest={macro?.latest ?? null} prev={macro?.prev ?? null} />
+                  <FxCell label="CNY/KRW" latest={macro?.cny?.latest ?? null} prev={macro?.cny?.prev ?? null} />
+                </div>
+                {macro?.latest_date && (
+                  <span className="text-[9px] text-[#bcbcc4] mt-0.5">{macro.latest_date} 기준</span>
+                )}
               </div>
               <button
                 onClick={() => setOwnOnly((v) => !v)}

@@ -1,4 +1,4 @@
-"""환율 수집(F12) — 한국은행 ECOS에서 USD/KRW를 macro_metric에 적재.
+"""환율 수집(F12) — 한국은행 ECOS에서 USD/KRW·CNY/KRW를 macro_metric에 적재.
 
 실행:  python -m collector.collect_macro [--days 90]
 ECOS_API_KEY 필요(.env). 멱등 upsert(metric_type, period 기준), 출처='ecos'.
@@ -24,37 +24,49 @@ def _parse_days(argv: list[str]) -> int:
     return 90
 
 
+def _upsert_metric(db, metric_type: str, rows: list[dict]) -> int:
+    upserts = 0
+    for r in rows:
+        period = datetime.strptime(r["period"], "%Y%m%d").date()
+        existing = db.scalar(
+            select(MacroMetric).where(
+                MacroMetric.metric_type == metric_type, MacroMetric.period == period
+            )
+        )
+        if existing:
+            existing.value = r["value"]
+            existing.source = "ecos"  # 합성→실데이터 출처 갱신
+        else:
+            db.add(
+                MacroMetric(
+                    metric_type=metric_type,
+                    period=period,
+                    value=r["value"],
+                    source="ecos",
+                )
+            )
+        upserts += 1
+    return upserts
+
+
 def run_macro(days: int = 90) -> dict:
     Base.metadata.create_all(bind=engine)
     end = date.today()
     start = end - timedelta(days=days)
+    s, e = start.strftime("%Y%m%d"), end.strftime("%Y%m%d")
     db = SessionLocal()
     client = EcosClient()
-    upserts = 0
     try:
-        rows = client.usd_krw(start.strftime("%Y%m%d"), end.strftime("%Y%m%d"))
-        for r in rows:
-            period = datetime.strptime(r["period"], "%Y%m%d").date()
-            existing = db.scalar(
-                select(MacroMetric).where(
-                    MacroMetric.metric_type == "usd_krw", MacroMetric.period == period
-                )
-            )
-            if existing:
-                existing.value = r["value"]
-                existing.source = "ecos"  # 합성→실데이터 출처 갱신
-            else:
-                db.add(
-                    MacroMetric(
-                        metric_type="usd_krw",
-                        period=period,
-                        value=r["value"],
-                        source="ecos",
-                    )
-                )
-            upserts += 1
+        result = {}
+        for metric, fetch in (("usd_krw", client.usd_krw), ("cny_krw", client.cny_krw)):
+            try:
+                rows = fetch(s, e)
+                upserts = _upsert_metric(db, metric, rows)
+                result[metric] = {"points": len(rows), "upserts": upserts}
+            except Exception as err:  # noqa: BLE001 — 한 통화 실패가 다른 통화를 막지 않게
+                result[metric] = {"error": str(err)}
         db.commit()
-        return {"metric": "usd_krw", "points": len(rows), "upserts": upserts}
+        return result
     finally:
         db.close()
 
