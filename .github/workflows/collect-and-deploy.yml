@@ -8,7 +8,7 @@ on:
   workflow_dispatch: {} # 수동 실행 버튼
 
 permissions:
-  contents: read
+  contents: write # keepalive 하트비트 커밋 푸시용 (cron 자동 비활성화 방지)
   pages: write
   id-token: write
 
@@ -87,3 +87,18 @@ jobs:
         with:
           path: frontend/dist
       - uses: actions/deploy-pages@v4
+
+      # GitHub는 저장소에 60일간 커밋 활동이 없으면 cron 워크플로를 자동 비활성화한다
+      # (2026-09-08 수집 중단의 원인). 수집 때마다 하트비트 커밋을 남겨 활동으로 카운트
+      # → 자동 비활성화 방지. [skip ci]로 deploy-on-push 중복 트리거는 차단.
+      - name: Keepalive commit (cron 자동 비활성화 방지)
+        if: always()
+        continue-on-error: true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > .github/last-collect.txt
+          git add .github/last-collect.txt
+          git commit -m "chore: collect heartbeat (keepalive) [skip ci]" || exit 0
+          git pull --rebase origin main || true
+          git push origin HEAD:main
