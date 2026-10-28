@@ -76,6 +76,8 @@ def _upsert(db, category_id: int, category_name: str, it: dict, matcher: BrandMa
             is_accessory=is_accessory_title(title),
             model_key=extract_model_key(title),
             naver_cat=(danawa_cat or "")[:60] or None,  # 분류 정합성 필드(다나와 분류명 재사용)
+            # 다나와 분류 말단을 세부유형으로 노출(양문형/드럼세탁기/캡슐커피머신 등 필터)
+            sub_category=(danawa_cat or "")[:60] or None,
             image_url=(it.get("image") or "")[:500] or None,
             link=(it.get("url") or "")[:500] or None,
             capacity_value=cap_val,
@@ -91,6 +93,8 @@ def _upsert(db, category_id: int, category_name: str, it: dict, matcher: BrandMa
             product.is_own_brand = m.is_own
         if danawa_cat and product.naver_cat != danawa_cat[:60]:
             product.naver_cat = danawa_cat[:60]
+        if danawa_cat and product.sub_category != danawa_cat[:60]:
+            product.sub_category = danawa_cat[:60]  # 세부유형 backfill
         if it.get("image") and product.image_url != it["image"]:
             product.image_url = it["image"][:500]
         if it.get("url") and product.link != it["url"]:

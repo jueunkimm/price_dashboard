@@ -42,9 +42,9 @@ export default function FilterCard({
     <div className="bg-white border border-[#e9e9ee] rounded-[14px] px-[18px] py-4">
       <div className="flex items-center gap-2 mb-3.5">
         <span className="text-sm font-bold">상세 필터</span>
-        <span className="text-xs text-[#9a9aa2]">카테고리 · 용량 · 브랜드 · 판매몰 · 가격대</span>
+        <span className="text-xs text-[#9a9aa2]">카테고리 · 세부유형 · 용량 · 브랜드 · 판매몰 · 가격대</span>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-[repeat(5,1fr)_1.3fr] gap-2.5 items-end">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-[repeat(6,1fr)_1.3fr] gap-2.5 items-end">
         <label className={LBL}>
           <span className={LBLT}>카테고리</span>
           <select
@@ -64,6 +64,21 @@ export default function FilterCard({
                   {c.category_name}
                 </option>
               ))}
+          </select>
+        </label>
+        <label className={LBL}>
+          <span className={LBLT}>세부유형</span>
+          <select
+            className={SEL}
+            value={filters.sub_category ?? ""}
+            onChange={(e) => onFilters({ sub_category: e.target.value || undefined })}
+          >
+            <option value="">전체 유형</option>
+            {(opts?.sub_categories ?? []).map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
           </select>
         </label>
         <label className={LBL}>
