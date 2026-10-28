@@ -9,8 +9,10 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from collections import Counter, defaultdict
+from urllib.parse import quote
 from datetime import date, datetime
 from pathlib import Path
 
@@ -42,6 +44,20 @@ def _enc(o):
 
 def _write(out: Path, name: str, data) -> None:
     (out / name).write_text(json.dumps(data, ensure_ascii=False, default=_enc), encoding="utf-8")
+
+
+_INFO_PCODE_RE = re.compile(r"prod\.danawa\.com/info/\?pcode=([^&]+)")
+
+
+def _safe_link(link: str | None, model_key: str | None, model_name: str) -> str | None:
+    """다나와 상세 링크 방어 — pcode가 숫자가 아니면(몰 상품코드) 상세 페이지가 없어
+    "잘못된 접근입니다"가 뜬다. 이 경우 모델코드/상품명 검색 링크로 대체한다."""
+    if not link:
+        return link
+    m = _INFO_PCODE_RE.search(link)
+    if m and not m.group(1).isdigit():
+        return f"https://search.danawa.com/?query={quote(model_key or model_name)}"
+    return link
 
 
 def _all_products(db) -> list[dict]:
@@ -114,7 +130,7 @@ def _all_products(db) -> list[dict]:
                 "capacity_band": aggregation._band(p),
                 "mall": aggregation._latest_mall(snaps.get(p.id, [])),
                 "image_url": p.image_url,
-                "link": p.link,
+                "link": _safe_link(p.link, p.model_key, p.model_name),
                 "current_price": ch["current_price"],
                 "prev_price": ch["prev_price"],
                 "change_pct": ch["change_pct"],

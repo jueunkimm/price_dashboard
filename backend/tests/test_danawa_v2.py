@@ -44,3 +44,71 @@ class TestExtractObjects:
         blob = '{"id":"7","productUrl":"x?pcode=7","price":{"min":10},"name":"브레이스 { } 포함"}'
         objs = _extract_objects(blob, must_have=('"productUrl"', '"price":{"min"'))
         assert len(objs) == 1 and objs[0]["name"] == "브레이스 { } 포함"
+
+
+class TestLinkSafety:
+    """몰 상품코드(EE128_…)로 만든 info?pcode= 링크는 '잘못된 접근입니다'가 뜬다."""
+
+    def test_export_sanitizes_mall_code_link(self):
+        from app.export_static import _safe_link
+
+        bad = "https://prod.danawa.com/info/?pcode=TYB19C_13746654684"
+        fixed = _safe_link(bad, "CSD-AHA110LW", "쿠쿠 리네이처 메디킨하이")
+        assert "pcode=" not in fixed
+        assert fixed.startswith("https://search.danawa.com/?query=CSD-AHA110LW")
+
+    def test_export_keeps_valid_links(self):
+        from app.export_static import _safe_link
+
+        ok = "https://prod.danawa.com/info/?pcode=92660366&cate=1"
+        assert _safe_link(ok, "X", "y") == ok
+        bridge = "https://prod.danawa.com/bridge/go_link_goods.php?cmpny_c=TZ6171&link_prod_c=1"
+        assert _safe_link(bridge, "X", "y") == bridge
+        assert _safe_link(None, "X", "y") is None
+
+    def test_pick_catalog_ignores_mall_listings(self):
+        from collector.collect_danawa_own import _pick_catalog
+
+        items = [
+            {"title": "쿠쿠 리네이처 CSD-AHA110LW", "price": 1557700, "maker": "쿠쿠", "is_catalog": True},
+            {"title": "쿠쿠홈시스 쿠쿠 CSD-AHA110LW 몰판매", "price": 1600000, "maker": "쿠쿠", "is_catalog": False},
+        ]
+        best = _pick_catalog("CSD-AHA110LW", items)
+        assert best["is_catalog"] is True and best["price"] == 1557700
+
+    def test_pick_catalog_none_when_only_mall_listings(self):
+        from collector.collect_danawa_own import _pick_catalog
+
+        items = [{"title": "쿠쿠 CSD-AHA110LW", "price": 1, "maker": "쿠쿠", "is_catalog": False}]
+        assert _pick_catalog("CSD-AHA110LW", items) is None  # → 몰 오퍼 폴백으로 넘어감
+
+
+class TestPurge:
+    def test_purge_removes_only_mall_code_products(self):
+        from sqlalchemy import create_engine, select
+        from sqlalchemy.orm import sessionmaker
+
+        from app.database import Base
+        from app.models import Category, PriceSnapshot, Product
+        from collector.collect_danawa_own import purge_broken_mall_products
+
+        eng = create_engine("sqlite+pysqlite:///:memory:")
+        Base.metadata.create_all(eng)
+        db = sessionmaker(bind=eng)()
+        cat = Category(name="c", level=2)
+        db.add(cat)
+        db.flush()
+        keep_ids = ["danawa:92660366", "danawa:offer-CSD-AHA110LW", "naver:123"]
+        for ext in keep_ids + ["danawa:EE128_3964263358", "danawa:TYB19C_13746654684"]:
+            p = Product(category_id=cat.id, external_id=ext, model_name=ext)
+            db.add(p)
+            db.flush()
+            db.add(PriceSnapshot(product_id=p.id, list_price=100))
+        db.commit()
+
+        assert purge_broken_mall_products(db) == 2
+        left = sorted(db.scalars(select(Product.external_id)).all())
+        assert left == sorted(keep_ids)
+        # 삭제된 제품의 이력도 함께 정리(고아 스냅샷 없음)
+        assert len(db.scalars(select(PriceSnapshot)).all()) == 3
+        assert purge_broken_mall_products(db) == 0  # 멱등

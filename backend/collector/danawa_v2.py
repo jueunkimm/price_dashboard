@@ -179,15 +179,24 @@ def search_products(query: str) -> list[dict]:
             continue
         if price <= 0 or not o.get("productSeq"):
             continue
+        seq = str(o.get("productSeq"))
+        # 검색결과에는 두 종류가 섞여 있다:
+        #  - 카탈로그(prodType=1): 숫자 pcode, info?pcode= 상세 페이지가 열림
+        #  - 몰 리스팅(prodType=3 등): 'EE128_3964263358' 같은 몰 상품코드. info?pcode=에 넣으면
+        #    다나와가 "잘못된 접근입니다"를 띄우므로, 원본 linkUrl(go_link_goods 연결 링크)을 써야 한다.
+        is_catalog = seq.isdigit()
+        link_url = o.get("linkUrl") or ""
+        url = f"https://prod.danawa.com/info/?pcode={seq}" if is_catalog else link_url
         items.append(
             {
-                "pcode": str(o.get("productSeq")),
+                "pcode": seq,
+                "is_catalog": is_catalog,
                 "title": _clean(o.get("productName")),
                 "maker": _clean(o.get("makerName")),
                 "brand": _clean(o.get("brandName")),
                 "price": price,
                 "spec_text": _spec_text(o),
-                "url": f"https://prod.danawa.com/info/?pcode={o.get('productSeq')}",
+                "url": url[:500],
             }
         )
     return items

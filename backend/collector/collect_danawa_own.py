@@ -42,7 +42,10 @@ def _pick_catalog(code: str, items: list[dict]) -> dict | None:
     cands = [
         it
         for it in items
-        if nc and nc in _norm(it["title"])
+        # 정식 카탈로그(숫자 pcode)만 — 몰 리스팅(EE128_… 코드)은 상세 페이지가 없어
+        # 링크가 깨지고 단일 몰 가격이라 최저가도 아니다. 몰 단위는 오퍼 폴백이 담당.
+        if it.get("is_catalog", True)
+        and nc and nc in _norm(it["title"])
         and not is_accessory_title(it["title"])
         and not is_rental_title(it["title"])
     ]
@@ -51,9 +54,41 @@ def _pick_catalog(code: str, items: list[dict]) -> dict | None:
     return max(pool, key=lambda x: x["price"]) if pool else None
 
 
+def purge_broken_mall_products(db) -> int:
+    """몰 상품코드(EE128_… 등)로 잘못 만들어진 제품과 그 이력을 정리한다.
+
+    이전 버전은 몰 리스팅을 카탈로그 상품으로 착각해 external_id를 'danawa:EE128_3964263358'
+    꼴로 저장했고, 링크(info?pcode=몰코드)가 열리지 않았다. 이들은 정식 카탈로그 항목(또는
+    'danawa:offer-코드')으로 대체되므로 중복 방지를 위해 제거한다. 멱등 — 없으면 0건.
+    """
+    from sqlalchemy import delete, update
+
+    from app.models import Alert
+
+    ids = [
+        pid
+        for pid, ext in db.execute(
+            select(Product.id, Product.external_id).where(Product.external_id.like("danawa:%"))
+        ).all()
+        if ext and not ext[len("danawa:"):].isdigit() and not ext.startswith("danawa:offer-")
+    ]
+    if not ids:
+        return 0
+    for i in range(0, len(ids), 500):  # SQLite 변수 한도 대비 청크
+        chunk = ids[i : i + 500]
+        db.execute(update(Alert).where(Alert.product_id.in_(chunk)).values(product_id=None))
+        db.execute(delete(PriceSnapshot).where(PriceSnapshot.product_id.in_(chunk)))
+        db.execute(delete(Product).where(Product.id.in_(chunk)))
+    db.commit()
+    return len(ids)
+
+
 def run(max_models: int = 900) -> dict:
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
+    purged = purge_broken_mall_products(db)
+    if purged:
+        print(f"[danawa_own] 깨진 몰코드 제품 {purged}개 정리(정식 카탈로그/오퍼로 대체)")
     log = CollectionLog(status="running")
     db.add(log)
     db.commit()
