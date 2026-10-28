@@ -37,13 +37,28 @@ jobs:
           key: pricedb-${{ github.run_id }}
           restore-keys: pricedb-
 
+      # 캐시 미스 폴백 — 릴리스 백업에서 복원 (캐시는 7일 미사용 시 삭제됨: 9/8~10/28
+      # 수집 공백 때 가격 이력을 통째로 잃은 원인. 릴리스 자산은 영구 보존)
+      - name: Restore price DB from release backup (cache miss fallback)
+        if: ${{ hashFiles('backend/app.db') == '' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download db-backup -p app.db.gz -O /tmp/app.db.gz -R "$GITHUB_REPOSITORY" \
+            && gunzip -c /tmp/app.db.gz > backend/app.db \
+            && echo "릴리스 백업에서 DB 복원" || echo "릴리스 백업 없음 — 빈 DB로 시작"
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Install backend deps
         run: pip install -r backend/requirements.txt
 
-      - name: Seeds (idempotent) + 수집
+      # 가격 수집 = 다나와 2-트랙 (네이버 쇼핑 검색 API는 2026-07-31 종료 — 재설계안_v2)
+      #  Track A: 카테고리 인기순 시장 수집 / Track B: 쿠쿠 카탈로그 모델 전수
+      #  두 수집기는 '0건=실패(exit 1)' 가드 내장 — 빈 결과로 기존 데이터를 덮지 않음
+      - name: Seeds (idempotent) + 다나와 수집
         working-directory: backend
         run: |
           python -m app.seed
@@ -52,16 +67,13 @@ jobs:
           python -m app.seed_alerts
           python -m app.cuckoo_catalog
           python -m app.migrate
-          python -m collector.collect
-          python -m collector.collect_cuckoo
-          python -m collector.collect_watchlist
+          python -m collector.collect_danawa_market --pages 3
+          python -m collector.collect_danawa_own
           python -m collector.collect_demand --days 90
           python -m collector.collect_macro --days 120 || echo "ECOS 키 없으면 건너뜀"
           python -m collector.auto_seed_brands || true
-          python -m collector.collect_danawa || true
           python -m collector.reclassify
           python -m collector.recategorize || true
-          python -m collector.enrich_subcategory
           python -m collector.audit_categories || true
           python -m collector.evaluate_alerts
           python -m app.export_static
@@ -81,6 +93,18 @@ jobs:
         with:
           path: backend/app.db
           key: pricedb-${{ github.run_id }}
+
+      # 영구 백업 — 릴리스 자산(db-backup)에 업로드. 캐시 증발(7일) 대비 2중 보존.
+      - name: Backup price DB to release
+        if: success()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gzip -c backend/app.db > /tmp/app.db.gz
+          gh release view db-backup -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create db-backup --title "price DB backup" --notes "자동 백업(매 수집)" -R "$GITHUB_REPOSITORY"
+          gh release upload db-backup /tmp/app.db.gz --clobber -R "$GITHUB_REPOSITORY"
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

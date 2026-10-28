@@ -37,6 +37,18 @@ jobs:
           key: pricedb-restore-${{ github.run_id }}
           restore-keys: pricedb-
 
+      # 캐시 미스 폴백 — 릴리스 백업(db-backup)에서 복원. 없으면 export 가드가
+      # 빈 배포를 차단한다(기존 사이트 데이터 보존).
+      - name: Restore price DB from release backup (cache miss fallback)
+        if: ${{ hashFiles('backend/app.db') == '' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download db-backup -p app.db.gz -O /tmp/app.db.gz -R "$GITHUB_REPOSITORY" \
+            && gunzip -c /tmp/app.db.gz > backend/app.db \
+            && echo "릴리스 백업에서 DB 복원" || echo "릴리스 백업 없음"
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

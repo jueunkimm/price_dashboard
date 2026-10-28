@@ -141,12 +141,12 @@ export default function RankCompare({ rows, q }: { rows: RankingRow[]; q: string
                     <a
                       href={
                         r.link ||
-                        `https://search.shopping.naver.com/search/all?query=${encodeURIComponent(r.model_name)}`
+                        `https://search.danawa.com/?query=${encodeURIComponent(r.model_name)}`
                       }
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      title={r.link ? "네이버 상품 페이지 열기" : "네이버 쇼핑에서 검색"}
+                      title={r.link ? "상품 페이지 열기" : "다나와에서 검색"}
                       className="w-6 h-6 flex items-center justify-center rounded-md text-[#9a9aa2] hover:text-own hover:bg-own/10 text-[13px]"
                     >
                       {r.link ? "↗" : "⌕"}

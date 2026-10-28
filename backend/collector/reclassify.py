@@ -100,16 +100,22 @@ def reclassify() -> dict:
                         category_moves += 1
                         p.category_id = tid
             # 용량: 다나와 구조화 사양 우선(정확), 없으면 제목에서 추출
+            # v2: 수집 시 spec_json.danawa_spec(다나와 목록 스펙 문자열) > 레거시 DanawaSpec 테이블 > 제목
             cur_cat_name = cat_names.get(p.category_id)
             cap_val = cap_unit = band = None
-            ds_spec = danawa.get(p.model_key) if p.model_key else None
+            old_json = dict(p.spec_json or {})
+            ds_spec = old_json.get("danawa_spec") or (danawa.get(p.model_key) if p.model_key else None)
             if ds_spec:
                 cap_val, cap_unit, band = extract_spec(cur_cat_name, ds_spec)
             if band is None:  # 다나와 미매칭/미추출 → 제목 폴백
                 cap_val, cap_unit, band = extract_spec(cur_cat_name, p.model_name or "")
             p.capacity_value = cap_val
             p.capacity_unit = cap_unit
-            p.spec_json = {"capacity_band": band} if band else None
+            # spec_json은 병합 보존 — danawa_spec/shop_count/hit_rank를 지우지 않는다
+            old_json.pop("capacity_band", None)
+            if band:
+                old_json["capacity_band"] = band
+            p.spec_json = old_json or None
         db.commit()
 
         after_own = sum(1 for p in products if p.is_own_brand)

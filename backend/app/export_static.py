@@ -163,11 +163,27 @@ def _demand(db) -> dict:
     return out
 
 
+MIN_EXPORT_PRODUCTS = 100  # export 가드 하한 — 이보다 적으면 빈/반토막 수집으로 간주
+
+
 def export_all(out_dir: Path | None = None) -> dict:
     out = out_dir or DEFAULT_OUT
     out.mkdir(parents=True, exist_ok=True)
     db = SessionLocal()
     try:
+        # ── export 가드 ──
+        # 수집 실패(소스 장애·파서 붕괴)로 DB가 비었을 때 export가 "성공"하면
+        # 라이브 사이트가 빈 데이터로 덮인다(2026-10-28 네이버 API 종료 사고).
+        # 현재가를 가진 본품이 하한 미만이면 export를 실패시켜 직전 배포 데이터를 보존한다.
+        guard_rows = _all_products(db)
+        priced = sum(1 for r in guard_rows if not r.get("is_accessory") and not r.get("is_rental"))
+        if priced < MIN_EXPORT_PRODUCTS:
+            print(
+                f"[export] 가드 발동 — 현재가 보유 본품 {priced}개 < 하한 {MIN_EXPORT_PRODUCTS}. "
+                "export 중단(기존 배포 데이터 보존)."
+            )
+            raise SystemExit(1)
+
         cats = [
             {
                 "category_id": c.id,

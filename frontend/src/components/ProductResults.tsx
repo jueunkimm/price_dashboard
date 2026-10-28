@@ -221,12 +221,12 @@ export default function ProductResults({
                         <a
                           href={
                             r.link ||
-                            `https://search.shopping.naver.com/search/all?query=${encodeURIComponent(r.model_name)}`
+                            `https://search.danawa.com/?query=${encodeURIComponent(r.model_name)}`
                           }
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          title={r.link ? "네이버 상품 페이지 열기" : "네이버 쇼핑에서 검색"}
+                          title={r.link ? "상품 페이지 열기" : "다나와에서 검색"}
                           className="truncate hover:text-own hover:underline decoration-own/40"
                         >
                           {r.model_name}
@@ -234,12 +234,12 @@ export default function ProductResults({
                         <a
                           href={
                             r.link ||
-                            `https://search.shopping.naver.com/search/all?query=${encodeURIComponent(r.model_name)}`
+                            `https://search.danawa.com/?query=${encodeURIComponent(r.model_name)}`
                           }
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          title={r.link ? "네이버 상품 페이지 열기" : "네이버 쇼핑에서 검색"}
+                          title={r.link ? "상품 페이지 열기" : "다나와에서 검색"}
                           className="shrink-0 text-slate-300 hover:text-own"
                         >
                           {r.link ? "↗" : "⌕"}

@@ -170,12 +170,18 @@ def recategorize() -> dict:
         for p in prods:
             cur = cat_names.get(p.category_id)
             cap_v = cap_u = band = None
-            spec = danawa_specs.get(p.model_key) if p.model_key else None
+            old_json = dict(p.spec_json or {})
+            # v2: 수집 시 spec_json.danawa_spec > 레거시 DanawaSpec 테이블 > 제목
+            spec = old_json.get("danawa_spec") or (danawa_specs.get(p.model_key) if p.model_key else None)
             if spec:
                 cap_v, cap_u, band = extract_spec(cur, spec)
             if band is None:
                 cap_v, cap_u, band = extract_spec(cur, p.model_name or "")
-            new_json = {"capacity_band": band} if band else None
+            # spec_json 병합 보존 — danawa_spec/shop_count/hit_rank 유지
+            old_json.pop("capacity_band", None)
+            if band:
+                old_json["capacity_band"] = band
+            new_json = old_json or None
             if p.capacity_unit != cap_u or (p.spec_json or None) != new_json:
                 recap += 1
             p.capacity_value, p.capacity_unit, p.spec_json = cap_v, cap_u, new_json
